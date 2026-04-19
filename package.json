@@ -1,0 +1,76 @@
+{
+  "name": "react-native-control-center",
+  "version": "0.0.1",
+  "description": "iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/src/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "files": [
+    "src",
+    "lib",
+    "ios",
+    "core",
+    "plugin",
+    "cli",
+    "app.plugin.js",
+    "!**/__tests__",
+    "!**/__fixtures__",
+    "!**/.DS_Store"
+  ],
+  "bin": {
+    "rn-control-center": "cli/bin/rn-control-center.js"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build": "bob build",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "control-center",
+    "control-widget",
+    "widget",
+    "expo",
+    "expo-config-plugin",
+    "ios18",
+    "app-intents"
+  ],
+  "author": "darby <darby@glorang.com>",
+  "license": "MIT",
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "react-native": ">=0.74.0"
+  },
+  "peerDependenciesMeta": {
+    "expo": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@babel/parser": "^7.26.0",
+    "@babel/traverse": "^7.26.0",
+    "@expo/config-plugins": "^9.0.0",
+    "handlebars": "^4.7.8",
+    "plist": "^3.1.0",
+    "xcode": "^3.0.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@types/babel__traverse": "^7.20.6",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^22.10.1",
+    "@types/plist": "^3.0.5",
+    "@types/react": "^19.0.0",
+    "jest": "^29.7.0",
+    "react": "19.0.0",
+    "react-native": "0.81.5",
+    "react-native-builder-bob": "^0.35.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  }
+}
