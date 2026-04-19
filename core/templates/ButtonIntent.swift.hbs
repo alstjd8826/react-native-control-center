@@ -1,0 +1,14 @@
+import AppIntents
+
+struct {{pascalCase id}}Intent: AppIntent {
+    static let title: LocalizedStringResource = "{{title}}"
+    static let openAppWhenRun: Bool = true
+
+    func perform() async throws -> some IntentResult {
+        ControlStore.shared.enqueueAction(
+            id: "{{id}}",
+            deepLink: "{{deepLink}}"
+        )
+        return .result()
+    }
+}

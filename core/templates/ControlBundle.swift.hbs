@@ -1,0 +1,11 @@
+import WidgetKit
+import SwiftUI
+
+@main
+struct {{bundleStructName}}: WidgetBundle {
+    var body: some Widget {
+        {{#each controls}}
+        {{pascalCase id}}Control()
+        {{/each}}
+    }
+}

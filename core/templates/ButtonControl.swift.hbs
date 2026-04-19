@@ -1,0 +1,22 @@
+import AppIntents
+import SwiftUI
+import WidgetKit
+
+struct {{pascalCase id}}Control: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(
+            kind: "{{bundleId}}.{{id}}"
+        ) {
+            ControlWidgetButton(action: {{pascalCase id}}Intent()) {
+                Label("{{title}}", systemImage: "{{icon}}")
+                {{#if tint}}
+                    .tint(Color(hex: "{{tint}}"))
+                {{/if}}
+            }
+        }
+        .displayName("{{title}}")
+        {{#if description}}
+        .description("{{description}}")
+        {{/if}}
+    }
+}
