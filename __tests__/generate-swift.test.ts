@@ -22,7 +22,7 @@ describe('generateSwiftFiles — Button', () => {
     icon: 'square.and.pencil',
   };
 
-  it('generates three files (bundle + control + intent)', () => {
+  it('generates four files (bundle + store + control + intent)', () => {
     const files = generateSwiftFiles({
       controls: [buttonControl],
       bundleId: 'com.darby.quicknote',
@@ -30,6 +30,7 @@ describe('generateSwiftFiles — Button', () => {
     });
     expect(files.map((f) => f.path)).toEqual([
       'ControlBundle.swift',
+      'ControlStore.swift',
       'Controls/QuickNoteControl.swift',
       'Intents/QuickNoteIntent.swift',
     ]);

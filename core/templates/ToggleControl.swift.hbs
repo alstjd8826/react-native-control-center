@@ -1,0 +1,40 @@
+import AppIntents
+import SwiftUI
+import WidgetKit
+
+struct {{pascalCase id}}Control: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(
+            kind: "{{bundleId}}.{{id}}",
+            provider: {{pascalCase id}}Provider()
+        ) { isOn in
+            ControlWidgetToggle(
+                "{{title}}",
+                isOn: isOn,
+                action: {{pascalCase id}}Intent()
+            ) { isOn in
+                Label(
+                    "{{title}}",
+                    systemImage: isOn ? "{{icons.on}}" : "{{icons.off}}"
+                )
+                {{#if tint}}
+                .tint(Color(hex: isOn ? "{{tint.on}}" : "{{tint.off}}"))
+                {{/if}}
+            }
+        }
+        .displayName("{{title}}")
+        {{#if description}}
+        .description("{{description}}")
+        {{/if}}
+    }
+}
+
+extension {{pascalCase id}}Control {
+    struct {{pascalCase id}}Provider: ControlValueProvider {
+        var previewValue: Bool { false }
+
+        func currentValue() async throws -> Bool {
+            return ControlStore.shared.getBool("{{stateKey}}")
+        }
+    }
+}

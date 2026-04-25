@@ -1,0 +1,17 @@
+import AppIntents
+
+struct {{pascalCase id}}Intent: SetValueIntent {
+    static let title: LocalizedStringResource = "{{title}}"
+
+    @Parameter(title: "{{title}}")
+    var value: Bool
+
+    func perform() async throws -> some IntentResult {
+        ControlStore.shared.setBool("{{stateKey}}", value: value)
+        ControlStore.shared.enqueueStateChange(
+            key: "{{stateKey}}",
+            value: value
+        )
+        return .result()
+    }
+}

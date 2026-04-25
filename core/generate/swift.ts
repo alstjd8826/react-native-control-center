@@ -7,7 +7,12 @@ export interface GenerateOptions {
   controls: ParsedControl[];
   bundleId: string;           // 메인 앱 bundleId (예: "com.darby.quicknote")
   urlScheme: string;          // 딥링크 스킴 (예: "quicknote")
+  appGroupId?: string;        // 기본: "group.{bundleId}.controls"
   bundleStructName?: string;  // 기본: "ControlCenterBundle"
+}
+
+export function defaultAppGroupId(bundleId: string): string {
+  return `group.${bundleId}.controls`;
 }
 
 export interface GeneratedFile {
@@ -46,6 +51,7 @@ export function pascalCase(str: string): string {
 export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
   registerHelpers();
   const bundleStructName = opts.bundleStructName ?? 'ControlCenterBundle';
+  const appGroupId = opts.appGroupId ?? defaultAppGroupId(opts.bundleId);
   const files: GeneratedFile[] = [];
 
   // 1. Bundle
@@ -55,6 +61,12 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
       bundleStructName,
       controls: opts.controls,
     }),
+  });
+
+  // 1b. ControlStore (shared between targets)
+  files.push({
+    path: 'ControlStore.swift',
+    content: loadTemplate('ControlStore.swift')({ appGroupId }),
   });
 
   // 2. Controls + Intents (컨트롤당 2파일)
@@ -74,8 +86,21 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
           deepLink: control.deepLink ?? `${opts.urlScheme}://control/${control.id}`,
         }),
       });
+    } else if (control.type === 'toggle') {
+      files.push({
+        path: `Controls/${pascalCase(control.id)}Control.swift`,
+        content: loadTemplate('ToggleControl.swift')({
+          ...control,
+          bundleId: opts.bundleId,
+        }),
+      });
+      files.push({
+        path: `Intents/${pascalCase(control.id)}Intent.swift`,
+        content: loadTemplate('ToggleIntent.swift')({
+          ...control,
+        }),
+      });
     }
-    // Toggle은 다음 단계에서
   }
 
   return files;
