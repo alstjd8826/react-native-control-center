@@ -112,31 +112,37 @@ This library takes a declarative TypeScript config and generates the full native
 
 ## Status
 
-Week 1 (Nov 2026) — **code generation pipeline** ✅
+Week 2 (Apr 2026) — **full native file generation** ✅ &nbsp; · &nbsp; **63 tests passing**
+
+Done so far:
 
 - [x] Public TS types (`defineControls`, `ButtonControl`, `ToggleControl`, `SFSymbolName`)
-- [x] SF Symbol literal union (curated ~200; full list in later)
+- [x] SF Symbol literal union (curated ~200; full set in later)
 - [x] Babel AST parser with literal-only policy and line-aware errors
-- [x] Handlebars templates for `ControlBundle`, Button control + intent
-- [x] Snapshot-tested code generator
+- [x] Handlebars templates for **Button** control + intent
+- [x] Handlebars templates for **Toggle** control + intent (with `ControlValueProvider`)
+- [x] `ControlStore.swift` runtime — App Group `UserDefaults` + Darwin notification
+- [x] Widget Extension `Info.plist` generator
+- [x] App Group entitlement generator (with merge into existing entitlements)
+- [x] **Single entry point** `generateNativeFiles()` that emits Swift + plist + entitlements together, each tagged with its target membership (`extension` / `app` / `shared`)
 - [x] End-to-end validated: generated Swift compiles and registers in iOS Control Center
 
-What's not wired yet: Toggle template, ControlStore runtime, pbxproj target wiring, Native Module, Expo/CLI entry points. All coming in Weeks 2–8.
+Coming in Weeks 3–8: pbxproj target wiring, Expo Config Plugin + CLI entry points, native module (Darwin observer + queue drain), full SF Symbol set, and example apps.
 
 ---
 
 ## Roadmap
 
-| Week | Milestone |
-| ---- | --------- |
-| 1 | Scaffold + AST parser + Button Swift templates |
-| 2 | Toggle template + ControlStore runtime + Info.plist / entitlement generation |
-| 3 | pbxproj target wiring (target add, framework link, membership) |
-| 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) |
-| 5 | Native Module (Darwin notifications + App Group UserDefaults) |
-| 6 | Full SF Symbol set + `useControlState` runtime |
-| 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests |
-| 8 | Documentation + npm publish (v0.1) |
+| Week | Milestone | Status |
+| ---- | --------- | ------ |
+| 1 | Scaffold + AST parser + Button Swift templates | ✅ |
+| 2 | Toggle template + ControlStore runtime + Info.plist / entitlement generation | ✅ |
+| 3 | pbxproj target wiring (target add, framework link, membership) | — |
+| 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | — |
+| 5 | Native Module (Darwin notifications + App Group UserDefaults) | — |
+| 6 | Full SF Symbol set + `useControlState` runtime | — |
+| 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests | — |
+| 8 | Documentation + npm publish (v0.1) | — |
 
 v0.2+: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, dynamic intents.
 
@@ -150,7 +156,7 @@ cd react-native-control-center
 npm install --legacy-peer-deps
 
 npm run typecheck   # tsc --noEmit
-npm test            # jest, 34 tests
+npm test            # jest, 63 tests
 ```
 
 The repo is structured as a publishable RN library plus the tooling that backs it:
