@@ -62,9 +62,9 @@ function enumerateTargets(project: PBXProject): TargetSummary[] {
 
     summaries.push({
       uuid,
-      name: target.name,
-      productName: target.productName,
-      productType: target.productType,
+      name: stripQuotes(target.name),
+      productName: stripQuotes(target.productName),
+      productType: stripQuotes(target.productType),
       dependencyCount: target.dependencies?.length ?? 0,
       buildPhases: summarizeBuildPhases(project, target),
     });
@@ -110,4 +110,16 @@ function findObjectAcrossSections(
 
 function countSection(section: Record<string, unknown>): number {
   return Object.keys(section).filter((k) => !k.endsWith('_comment')).length;
+}
+
+/**
+ * pbxproj는 공백이나 특수문자가 있으면 문자열을 큰따옴표로 감싸서 저장한다.
+ * 단순 이름 비교를 위해 둘러싼 따옴표만 제거한다.
+ */
+function stripQuotes(value: string | undefined): string {
+  if (!value) return '';
+  if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+    return value.slice(1, -1);
+  }
+  return value;
 }
