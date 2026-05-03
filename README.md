@@ -112,22 +112,27 @@ This library takes a declarative TypeScript config and generates the full native
 
 ## Status
 
-Week 2 (Apr 2026) — **full native file generation** ✅ &nbsp; · &nbsp; **63 tests passing**
+Week 3 (May 2026) — **pbxproj wiring complete** ✅ &nbsp; · &nbsp; **99 tests passing**
 
 Done so far:
 
 - [x] Public TS types (`defineControls`, `ButtonControl`, `ToggleControl`, `SFSymbolName`)
 - [x] SF Symbol literal union (curated ~200; full set in later)
 - [x] Babel AST parser with literal-only policy and line-aware errors
-- [x] Handlebars templates for **Button** control + intent
-- [x] Handlebars templates for **Toggle** control + intent (with `ControlValueProvider`)
+- [x] Handlebars templates for **Button** + **Toggle** controls and their intents
 - [x] `ControlStore.swift` runtime — App Group `UserDefaults` + Darwin notification
 - [x] Widget Extension `Info.plist` generator
 - [x] App Group entitlement generator (with merge into existing entitlements)
-- [x] **Single entry point** `generateNativeFiles()` that emits Swift + plist + entitlements together, each tagged with its target membership (`extension` / `app` / `shared`)
-- [x] End-to-end validated: generated Swift compiles and registers in iOS Control Center
+- [x] `generateNativeFiles()` — single entry point for all generated files, each tagged with target membership (`extension` / `app` / `shared`)
+- [x] **`wireXcodeProject()`** — single entry point that mutates a user `project.pbxproj`:
+  - adds the Widget Extension target (with auto-embed into main app)
+  - links `WidgetKit` / `SwiftUI` / `AppIntents` into the right targets, reusing one `PBXFileReference` per framework across multiple `PBXBuildFile` memberships
+  - registers a `PBXFileSystemSynchronizedRootGroup` for the extension folder and a `PBXFileSystemSynchronizedBuildFileExceptionSet` so shared files (Intents, `ControlStore.swift`) belong to both targets
+  - sets all the build settings the extension needs (`IPHONEOS_DEPLOYMENT_TARGET=18.0`, `INFOPLIST_FILE`, `CODE_SIGN_ENTITLEMENTS`, `SWIFT_VERSION`, `PRODUCT_BUNDLE_IDENTIFIER`)
+  - wires `CODE_SIGN_ENTITLEMENTS` for the main app target so App Group sharing works
+  - verifies the extension is embedded before returning
 
-Coming in Weeks 3–8: pbxproj target wiring, Expo Config Plugin + CLI entry points, native module (Darwin observer + queue drain), full SF Symbol set, and example apps.
+Coming in Weeks 4–8: Expo Config Plugin + CLI entry points (so all of the above runs automatically during `expo prebuild` or `npx rn-control-center generate`), native module (Darwin observer + queue drain), full SF Symbol set, and example apps.
 
 ---
 
@@ -137,7 +142,7 @@ Coming in Weeks 3–8: pbxproj target wiring, Expo Config Plugin + CLI entry poi
 | ---- | --------- | ------ |
 | 1 | Scaffold + AST parser + Button Swift templates | ✅ |
 | 2 | Toggle template + ControlStore runtime + Info.plist / entitlement generation | ✅ |
-| 3 | pbxproj target wiring (target add, framework link, membership) | — |
+| 3 | pbxproj target wiring (target add, framework link, membership, build settings) | ✅ |
 | 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | — |
 | 5 | Native Module (Darwin notifications + App Group UserDefaults) | — |
 | 6 | Full SF Symbol set + `useControlState` runtime | — |
@@ -156,7 +161,7 @@ cd react-native-control-center
 npm install --legacy-peer-deps
 
 npm run typecheck   # tsc --noEmit
-npm test            # jest, 63 tests
+npm test            # jest, 99 tests
 ```
 
 The repo is structured as a publishable RN library plus the tooling that backs it:
