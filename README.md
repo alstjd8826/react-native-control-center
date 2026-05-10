@@ -4,7 +4,7 @@ iOS 18+ Control Center custom controls for React Native — declare in TypeScrip
 
 ![status](https://img.shields.io/badge/status-WIP_v0.0.1-orange) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
-> ⚠️ **Work in progress.** Swift code generation is complete; Xcode target wiring and the native module are in active development. See [Roadmap](#roadmap).
+> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) is complete and validated end-to-end. The runtime native module (Darwin queue drain → JS events) lands in Week 5. See [Roadmap](#roadmap).
 
 ---
 
@@ -90,49 +90,166 @@ This library takes a declarative TypeScript config and generates the full native
 
 ## How it works
 
+There are two distinct flows worth understanding: what happens **at build time**
+when you run `expo prebuild` (or `rn-control-center generate`), and what happens
+**at runtime** when a user taps a control in Control Center.
+
+### Build-time pipeline
+
 ```
- src/controls.ts (TypeScript)
-       │
-       ▼
- Config Plugin          ← runs during `expo prebuild`
-   ├── Babel AST parser extracts Control[] from the literal config
-   ├── Handlebars renders Swift files (Bundle, Control, Intent, Store)
-   ├── `xcode` npm package adds the Widget Extension target
-   ├── pbxproj target-memberships the Intent into main app AND extension
-   └── `@expo/config-plugins` injects entitlements + URL scheme
-       │
-       ▼
- ios/ControlCenterExtension/   ← fully-wired widget, ready to build
-       │
-       ▼
- Native Module bridges intent events + shared UserDefaults state to JS
+[ npx expo prebuild ]                      [ npx rn-control-center generate ]
+        │                                              │
+        ▼                                              ▼
+ Expo reads app.json plugins              cli/bin reads package.json
+        │                                              │
+        ▼                                              ▼
+ plugin/index.ts                          cli/runGenerate.ts
+   withControlCenter(config, props)         runGenerate({ projectRoot })
+        │                                              │
+        ├── validateProps()                            │
+        │                                              │
+        ├── withDangerousMod(...) ────────┐            │
+        │       parseControlsFile()       │            │
+        │       generateNativeFiles()     │            │
+        │       fs.writeFileSync(...)     │            │
+        │                                 │            │
+        └── withXcodeProject(...) ────────┘            │
+                wireXcodeProject(project, opts)        │
+                                                       │
+                                                       ▼
+        ┌──── parseControlsFile()  ◄────  reads ./src/controls.ts and turns
+        │                                  the defineControls({...}) literal
+        │                                  into ParsedControl[] (Babel AST)
+        │
+        ├──── generateNativeFiles()  ──►  emits 8 NativeFile records:
+        │                                  • ControlBundle.swift
+        │                                  • ControlStore.swift
+        │                                  • Controls/<Name>Control.swift × N
+        │                                  • Intents/<Name>Intent.swift × N
+        │                                  • Info.plist
+        │                                  • <ext>.entitlements (widget)
+        │                                  • MainApp.entitlements (main app)
+        │
+        ├──── fs.writeFileSync(...)  ──►  writes the eight files into
+        │                                  ios/ControlCenterExtension/
+        │
+        └──── wireXcodeProject(...)  ──►  mutates project.pbxproj:
+                  ├── addWidgetExtensionTarget()       app-extension target
+                  │                                    + auto PBXCopyFilesBuildPhase
+                  │                                      embedding the .appex
+                  ├── linkFrameworks(widget,           one PBXFileReference,
+                  │     ['WidgetKit','SwiftUI',         one PBXBuildFile per
+                  │      'AppIntents'])                 target's Frameworks phase
+                  ├── linkFrameworks(mainApp,
+                  │     ['AppIntents'])
+                  ├── addSyncedSourceFolder()          PBXFileSystemSynchronizedRootGroup
+                  │                                    + 2 ExceptionSets:
+                  │                                      • shared files → main app
+                  │                                      • plist/entitlements → exclude widget
+                  ├── setTargetBuildSettings(widget,   IPHONEOS_DEPLOYMENT_TARGET=18.0,
+                  │     {...})                          INFOPLIST_FILE,
+                  │                                     CODE_SIGN_ENTITLEMENTS,
+                  │                                     GENERATE_INFOPLIST_FILE=NO, ...
+                  ├── setTargetBuildSettings(mainApp,  CODE_SIGN_ENTITLEMENTS,
+                  │     {...})                          IPHONEOS_DEPLOYMENT_TARGET≥16.0
+                  └── verifyEmbedded()                  sanity check
+                                                       │
+                                                       ▼
+                                                 project.writeSync()
+                                                       │
+                                                       ▼
+                                                 CocoaPods install
+                                                       │
+                                                       ▼
+                                                 ios/ ready to xcodebuild
+```
+
+### Runtime — Button tap (e.g. "Quick Note")
+
+```
+①  user taps "Quick Note" in Control Center
+        │
+        ▼
+②  iOS wakes the widget extension process
+        │
+        ▼
+③  QuickNoteIntent.perform() runs (in widget process)
+        │   ControlStore.shared.enqueueAction(id, deepLink)
+        │     └── push event to App Group UserDefaults queue
+        │     └── post a Darwin notification
+        │   return .result()
+        │
+        ▼
+④  iOS sees `static let openAppWhenRun: Bool = true`
+        └── brings the main app to the foreground
+        │
+        ▼
+⑤  Main app starts/resumes
+        └── (Week 5) Native Module observes the Darwin notification,
+            drains the App Group queue, emits a JS event
+        │
+        ▼
+⑥  ControlCenter.onAction(({ id }) => ...) fires in JS
+```
+
+### Runtime — Toggle tap (e.g. "VPN")
+
+Two phases interleave: **rendering** (whenever Control Center asks the widget
+to draw itself) and **action** (when the user actually taps the toggle).
+
+```
+[ rendering ]
+①  Control Center asks the widget for its current state
+        │
+        ▼
+②  Provider.currentValue() runs
+        └── ControlStore.shared.getBool('vpnEnabled')
+              └── reads from App Group UserDefaults
+        │
+        ▼
+③  iOS draws the toggle with the returned value
+        └── on-icon vs off-icon, on-tint vs off-tint
+
+[ action ]
+①  user taps the toggle (currently OFF)
+        │
+        ▼
+②  iOS computes the new value (true) and injects into VpnToggleIntent.value
+        │
+        ▼
+③  VpnToggleIntent.perform() runs
+        │   ControlStore.shared.setBool('vpnEnabled', true)
+        │     └── write to App Group UserDefaults FIRST
+        │   ControlStore.shared.enqueueStateChange('vpnEnabled', true)
+        │     └── push event to queue + post Darwin notification
+        │   return .result()
+        │
+        ▼
+④  iOS re-runs the rendering flow above; toggle visually flips to ON
+        │
+        ▼
+⑤  (Week 5) Native Module drains the queue, emits a JS event
+        └── useControlState('vpnEnabled') hook updates → UI rerenders
 ```
 
 ---
 
 ## Status
 
-Week 3 (May 2026) — **pbxproj wiring complete** ✅ &nbsp; · &nbsp; **99 tests passing**
+Week 4 (May 2026) — **end-to-end working in a real Expo project** ✅ &nbsp; · &nbsp; **120 tests passing**
 
-Done so far:
+What works today:
 
-- [x] Public TS types (`defineControls`, `ButtonControl`, `ToggleControl`, `SFSymbolName`)
-- [x] SF Symbol literal union (curated ~200; full set in later)
+- [x] `defineControls({...})` types + `~200` curated SF Symbols literal union
 - [x] Babel AST parser with literal-only policy and line-aware errors
-- [x] Handlebars templates for **Button** + **Toggle** controls and their intents
-- [x] `ControlStore.swift` runtime — App Group `UserDefaults` + Darwin notification
-- [x] Widget Extension `Info.plist` generator
-- [x] App Group entitlement generator (with merge into existing entitlements)
-- [x] `generateNativeFiles()` — single entry point for all generated files, each tagged with target membership (`extension` / `app` / `shared`)
-- [x] **`wireXcodeProject()`** — single entry point that mutates a user `project.pbxproj`:
-  - adds the Widget Extension target (with auto-embed into main app)
-  - links `WidgetKit` / `SwiftUI` / `AppIntents` into the right targets, reusing one `PBXFileReference` per framework across multiple `PBXBuildFile` memberships
-  - registers a `PBXFileSystemSynchronizedRootGroup` for the extension folder and a `PBXFileSystemSynchronizedBuildFileExceptionSet` so shared files (Intents, `ControlStore.swift`) belong to both targets
-  - sets all the build settings the extension needs (`IPHONEOS_DEPLOYMENT_TARGET=18.0`, `INFOPLIST_FILE`, `CODE_SIGN_ENTITLEMENTS`, `SWIFT_VERSION`, `PRODUCT_BUNDLE_IDENTIFIER`)
-  - wires `CODE_SIGN_ENTITLEMENTS` for the main app target so App Group sharing works
-  - verifies the extension is embedded before returning
+- [x] Handlebars templates for **Button** + **Toggle** controls, intents, and `ControlStore.swift`
+- [x] `generateNativeFiles()` — emits 8 Swift/plist/entitlement files tagged with target membership
+- [x] `wireXcodeProject()` — mutates `project.pbxproj` to add the widget target, link frameworks, register the synced folder + ExceptionSets, and apply build settings on both targets
+- [x] **Expo Config Plugin** (`plugin/index.ts`) wires the entire pipeline into `expo prebuild`
+- [x] **Standalone CLI** (`npx rn-control-center generate`) runs the same pipeline for bare RN CLI projects
+- [x] **End-to-end validated:** in a real Expo app, `expo prebuild` produces a project that builds with `xcodebuild`, the control shows up in iOS Control Center, and tapping it opens the main app — the failure mode that bacons-based setups hit because they couldn't put the AppIntent in both targets is solved here by the ExceptionSet flow
 
-Coming in Weeks 4–8: Expo Config Plugin + CLI entry points (so all of the above runs automatically during `expo prebuild` or `npx rn-control-center generate`), native module (Darwin observer + queue drain), full SF Symbol set, and example apps.
+Coming in Weeks 5–8: native module (Darwin observer + queue drain to JS), `ControlCenter.onAction` and `useControlState` runtime, full SF Symbol set, example apps, and v0.1 publish.
 
 ---
 
@@ -143,7 +260,7 @@ Coming in Weeks 4–8: Expo Config Plugin + CLI entry points (so all of the abov
 | 1 | Scaffold + AST parser + Button Swift templates | ✅ |
 | 2 | Toggle template + ControlStore runtime + Info.plist / entitlement generation | ✅ |
 | 3 | pbxproj target wiring (target add, framework link, membership, build settings) | ✅ |
-| 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | — |
+| 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | ✅ |
 | 5 | Native Module (Darwin notifications + App Group UserDefaults) | — |
 | 6 | Full SF Symbol set + `useControlState` runtime | — |
 | 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests | — |
@@ -161,7 +278,7 @@ cd react-native-control-center
 npm install --legacy-peer-deps
 
 npm run typecheck   # tsc --noEmit
-npm test            # jest, 99 tests
+npm test            # jest, 120 tests
 ```
 
 The repo is structured as a publishable RN library plus the tooling that backs it:
