@@ -2,16 +2,34 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+// ─────────────────────────────────────────────────────────────────────────
+//  📄  {{pascalCase id}}Control.swift   (Controls/{{pascalCase id}}Control.swift)
+//  Toggle 표시 흐름 (제어센터를 열 때마다)
+// ─────────────────────────────────────────────────────────────────────────
+//
+//  ① 사용자가 제어센터를 열거나 토글이 화면에 보이려 함
+//        ↓
+//  ② iOS가 Provider.currentValue() 호출 → "지금 ON 인지 OFF 인지?" 질의
+//        ↓
+//  ③ Provider가 ControlStore.shared.getBool("{{stateKey}}") 호출
+//        → App Group UserDefaults에서 현재 값 읽음
+//        ↓
+//  ④ iOS가 그 값(isOn)으로 ControlWidgetToggle을 그림
+//        - on이면 icons.on, off면 icons.off
+//        - on/off 색상도 분기
+//
+// ─────────────────────────────────────────────────────────────────────────
+
 struct {{pascalCase id}}Control: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(
             kind: "{{bundleId}}.{{id}}",
-            provider: {{pascalCase id}}Provider()
+            provider: {{pascalCase id}}Provider()       // ② 상태 질의 대상
         ) { isOn in
             ControlWidgetToggle(
                 "{{title}}",
-                isOn: isOn,
-                action: {{pascalCase id}}Intent()
+                isOn: isOn,                              // ④ Provider가 답한 값
+                action: {{pascalCase id}}Intent()        // 사용자가 탭하면 이게 실행
             ) { isOn in
                 Label(
                     "{{title}}",
@@ -31,8 +49,10 @@ struct {{pascalCase id}}Control: ControlWidget {
 
 extension {{pascalCase id}}Control {
     struct {{pascalCase id}}Provider: ControlValueProvider {
+        // 미리보기/플레이스홀더용 기본값
         var previewValue: Bool { false }
 
+        // ③ iOS가 토글을 그릴 때마다 호출. 공유 저장소에서 현재 상태를 읽어 반환.
         func currentValue() async throws -> Bool {
             return ControlStore.shared.getBool("{{stateKey}}")
         }

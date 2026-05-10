@@ -1,17 +1,49 @@
 import AppIntents
 
+// ─────────────────────────────────────────────────────────────────────────
+//  📄  {{pascalCase id}}Intent.swift   (Intents/{{pascalCase id}}Intent.swift)
+//  Toggle 탭 → 상태 변경 흐름
+// ─────────────────────────────────────────────────────────────────────────
+//
+//  ① 사용자가 제어센터에서 "{{title}}" 토글을 탭함
+//        ↓
+//  ② iOS가 새 값을 결정 (현재 OFF면 true, ON이면 false)
+//        ↓
+//  ③ iOS가 {{pascalCase id}}Intent를 인스턴스화하고 self.value에 새 값 주입
+//        ↓
+//  ④ perform() 호출:
+//       (a) ControlStore.shared.setBool("{{stateKey}}", value)
+//             → App Group UserDefaults에 새 상태 저장 (먼저!)
+//       (b) ControlStore.shared.enqueueStateChange()
+//             → JS에 알릴 이벤트 큐에 기록
+//             → Darwin Notification 발송 (앱이 살아있으면 즉시 깨움)
+//        ↓
+//  ⑤ return .result() — perform 종료
+//        ↓
+//  ⑥ iOS가 토글을 새 값으로 다시 그림 (Provider 재호출)
+//        ↓
+//  ⑦ (앱이 실행 중이면) Native Module이 ④(b) 큐 drain → JS의
+//     ControlCenter.onStateChange("{{stateKey}}", v => ...) 콜백 발화 (Week 5)
+//
+// ─────────────────────────────────────────────────────────────────────────
+
 struct {{pascalCase id}}Intent: SetValueIntent {
     static let title: LocalizedStringResource = "{{title}}"
 
     @Parameter(title: "{{title}}")
-    var value: Bool
+    var value: Bool                                  // ③ iOS가 자동 주입
 
     func perform() async throws -> some IntentResult {
+        // ④ (a): 새 상태를 공유 저장소에 먼저 저장 (순서 중요)
         ControlStore.shared.setBool("{{stateKey}}", value: value)
+
+        // ④ (b): JS 측에 변화를 알릴 이벤트 큐에 기록 + Darwin 알림 발송
         ControlStore.shared.enqueueStateChange(
             key: "{{stateKey}}",
             value: value
         )
+
+        // ⑤ 끝
         return .result()
     }
 }

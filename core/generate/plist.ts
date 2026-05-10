@@ -14,7 +14,17 @@ export interface GeneratePlistOptions {
  * iOS가 이 값을 보고 ControlWidget으로 인식.
  */
 export function generateExtensionInfoPlist(opts: GeneratePlistOptions = {}): string {
+  // GENERATE_INFOPLIST_FILE=NO 일 때 Xcode가 표준 키를 자동 채워주지 않으므로
+  // AppIntentsSSU 같은 후속 빌드 도구가 요구하는 최소 키들을 우리가 직접 넣어준다.
   const root: Record<string, unknown> = {
+    CFBundleDevelopmentRegion: '$(DEVELOPMENT_LANGUAGE)',
+    CFBundleExecutable: '$(EXECUTABLE_NAME)',
+    CFBundleIdentifier: '$(PRODUCT_BUNDLE_IDENTIFIER)',
+    CFBundleInfoDictionaryVersion: '6.0',
+    CFBundleName: '$(PRODUCT_NAME)',
+    CFBundlePackageType: '$(PRODUCT_BUNDLE_PACKAGE_TYPE)',
+    CFBundleShortVersionString: '1.0',
+    CFBundleVersion: '1',
     NSExtension: {
       NSExtensionPointIdentifier: 'com.apple.widgetkit-extension',
     },

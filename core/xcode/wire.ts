@@ -57,11 +57,20 @@ export function wireXcodeProject(project: PBXProject, options: WireOptions): Wir
   });
 
   // 3) Synced 폴더 + ExceptionSet
+  //    - sharedFiles는 메인 앱이 추가로 가져가야 하므로 mainAppTargetUuid 쪽 예외
+  //    - Info.plist와 entitlements는 위젯 build settings로 참조되므로 위젯의 자동
+  //      멤버십에서는 빼야 "Multiple commands produce" 충돌이 안 남
+  const widgetExclusions = [
+    'Info.plist',
+    `${options.widgetTargetName}.entitlements`,
+    'MainApp.entitlements',
+  ];
   addSyncedSourceFolder(project, {
     widgetTargetUuid,
     mainAppTargetUuid,
     folderName: options.widgetTargetName,
     sharedFiles: options.sharedFiles,
+    excludedFromWidget: widgetExclusions,
   });
 
   // 4) 위젯 타겟 build settings
@@ -71,16 +80,27 @@ export function wireXcodeProject(project: PBXProject, options: WireOptions): Wir
   setTargetBuildSettings(project, widgetTargetUuid, {
     IPHONEOS_DEPLOYMENT_TARGET: deploymentTarget,
     INFOPLIST_FILE: `${options.widgetTargetName}/Info.plist`,
+    // 우리가 직접 Info.plist를 만들기 때문에 Xcode 자동 생성을 끔.
+    // 안 끄면 "Multiple commands produce Info.plist" 빌드 충돌 발생.
+    GENERATE_INFOPLIST_FILE: 'NO',
     CODE_SIGN_ENTITLEMENTS: widgetEntitlementsPath,
     SWIFT_VERSION: swiftVersion,
     PRODUCT_BUNDLE_IDENTIFIER: options.widgetBundleId,
     SKIP_INSTALL: 'NO',
   });
 
-  // 5) 메인 앱 타겟 build settings (entitlement 경로만 더해줌)
-  setTargetBuildSettings(project, mainAppTargetUuid, {
+  // 5) 메인 앱 타겟 build settings.
+  //    - entitlement 경로 (App Group 공유)
+  //    - 공유되는 Intent 파일이 LocalizedStringResource 등 iOS 16+ API를 쓰므로
+  //      배포 타겟이 16.0보다 낮으면 16.0으로 올림 (이미 16+면 사용자 값 유지).
+  const mainAppSettings: Record<string, string> = {
     CODE_SIGN_ENTITLEMENTS: mainEntitlementsPath,
-  });
+  };
+  const currentMainTarget = readDeploymentTarget(project, mainAppTargetUuid);
+  if (currentMainTarget === null || compareVersion(currentMainTarget, '16.0') < 0) {
+    mainAppSettings.IPHONEOS_DEPLOYMENT_TARGET = '16.0';
+  }
+  setTargetBuildSettings(project, mainAppTargetUuid, mainAppSettings);
 
   // 6) 임베드 검증
   const embedCheck = verifyEmbedded(project, mainAppTargetUuid, widgetTargetUuid);
@@ -111,4 +131,45 @@ function stripQuotes(value: string | undefined): string {
     return value.slice(1, -1);
   }
   return value;
+}
+
+function readDeploymentTarget(
+  project: PBXProject,
+  targetUuid: string
+): string | null {
+  const objects = project.hash.project.objects;
+  const target = project.pbxNativeTargetSection()[targetUuid] as
+    | Record<string, unknown>
+    | undefined;
+  if (!target) return null;
+  const configListUuid = target.buildConfigurationList as string | undefined;
+  if (!configListUuid) return null;
+  const configList = objects['XCConfigurationList']?.[configListUuid] as
+    | Record<string, unknown>
+    | undefined;
+  if (!configList) return null;
+  const buildConfigs =
+    (configList.buildConfigurations as Array<{ value: string }>) ?? [];
+  for (const ref of buildConfigs) {
+    const config = objects['XCBuildConfiguration']?.[ref.value] as
+      | Record<string, unknown>
+      | undefined;
+    if (!config) continue;
+    const settings = config.buildSettings as Record<string, string> | undefined;
+    const v = settings?.IPHONEOS_DEPLOYMENT_TARGET;
+    if (v) return stripQuotes(v);
+  }
+  return null;
+}
+
+function compareVersion(a: string, b: string): number {
+  const pa = a.split('.').map((n) => parseInt(n, 10));
+  const pb = b.split('.').map((n) => parseInt(n, 10));
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i++) {
+    const ai = pa[i] ?? 0;
+    const bi = pb[i] ?? 0;
+    if (ai !== bi) return ai - bi;
+  }
+  return 0;
 }

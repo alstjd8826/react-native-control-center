@@ -10,6 +10,12 @@ export interface AddSyncedFolderOptions {
   folderName: string;
   /** 메인 앱과 공유할 폴더 내 파일들 (폴더 기준 상대 경로) */
   sharedFiles: string[];
+  /**
+   * 위젯 타겟의 Sources/Resources 자동 멤버십에서 제외할 파일들.
+   * Info.plist, *.entitlements 같이 build setting으로 따로 참조하는 파일은
+   * 자동 컴파일/복사에서 빼야 "Multiple commands produce" 충돌을 피한다.
+   */
+  excludedFromWidget?: string[];
 }
 
 /**
@@ -27,20 +33,35 @@ export function addSyncedSourceFolder(
 ): void {
   const objects = project.hash.project.objects;
 
-  // 0) sharedFiles가 있으면 ExceptionSet 먼저 만든다
-  let exceptionUuid: string | null = null;
-  if (options.sharedFiles.length > 0) {
-    exceptionUuid = generateUuid(project);
-    const exceptionSection =
-      (objects['PBXFileSystemSynchronizedBuildFileExceptionSet'] ??= {});
-    const comment = `Exceptions for "${options.folderName}" folder in main app target`;
+  // 0) ExceptionSet들 만들기. 다음 두 종류:
+  //    - sharedFiles → 메인 앱이 추가 멤버로 가져갈 파일들
+  //    - excludedFromWidget → 위젯 자기 자신의 자동 멤버십에서 빼는 파일들 (Info.plist 등)
+  const exceptionRefs: Array<{ value: string; comment?: string }> = [];
+  const exceptionSection =
+    (objects['PBXFileSystemSynchronizedBuildFileExceptionSet'] ??= {});
 
-    exceptionSection[exceptionUuid] = {
+  if (options.sharedFiles.length > 0) {
+    const uuid = generateUuid(project);
+    const comment = `Exceptions for "${options.folderName}" folder in main app target`;
+    exceptionSection[uuid] = {
       isa: 'PBXFileSystemSynchronizedBuildFileExceptionSet',
       membershipExceptions: options.sharedFiles,
       target: options.mainAppTargetUuid,
     };
-    exceptionSection[`${exceptionUuid}_comment`] = comment;
+    exceptionSection[`${uuid}_comment`] = comment;
+    exceptionRefs.push({ value: uuid, comment });
+  }
+
+  if (options.excludedFromWidget && options.excludedFromWidget.length > 0) {
+    const uuid = generateUuid(project);
+    const comment = `Exceptions for "${options.folderName}" folder in widget target`;
+    exceptionSection[uuid] = {
+      isa: 'PBXFileSystemSynchronizedBuildFileExceptionSet',
+      membershipExceptions: options.excludedFromWidget,
+      target: options.widgetTargetUuid,
+    };
+    exceptionSection[`${uuid}_comment`] = comment;
+    exceptionRefs.push({ value: uuid, comment });
   }
 
   // 1) SynchronizedRootGroup 객체 생성
@@ -53,10 +74,8 @@ export function addSyncedSourceFolder(
     path: options.folderName,
     sourceTree: '"<group>"',
   };
-  if (exceptionUuid) {
-    groupObject.exceptions = [
-      { value: exceptionUuid, comment: `Exceptions for "${options.folderName}" folder in main app target` },
-    ];
+  if (exceptionRefs.length > 0) {
+    groupObject.exceptions = exceptionRefs;
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (groupSection as any)[groupUuid] = groupObject;

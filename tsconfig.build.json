@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./lib/commonjs",
+    "rootDir": ".",
+    "module": "commonjs",
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false
+  },
+  "include": ["src", "core", "plugin", "cli"],
+  "exclude": [
+    "node_modules",
+    "lib",
+    "**/__tests__/**",
+    "**/__fixtures__/**",
+    "**/*.test.ts"
+  ]
+}

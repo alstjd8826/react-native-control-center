@@ -95,7 +95,8 @@ describe('wireXcodeProject (full integration)', () => {
       const exceptionCount = Object.keys(
         project.hash.project.objects['PBXFileSystemSynchronizedBuildFileExceptionSet'] ?? {}
       ).filter((k) => !k.endsWith('_comment')).length;
-      expect(exceptionCount).toBe(3); // Phase 2 2개 + 우리 1개 (sharedFiles 있으므로)
+      // Phase 2 fixture 2개 + 우리 2개 (sharedFiles 메인앱 노출 + 위젯 plist/ent 제외)
+      expect(exceptionCount).toBe(4);
     });
   });
 
