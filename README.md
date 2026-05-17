@@ -4,7 +4,7 @@ iOS 18+ Control Center custom controls for React Native — declare in TypeScrip
 
 ![status](https://img.shields.io/badge/status-WIP_v0.0.1-orange) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
-> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) is complete and validated end-to-end. The runtime native module (Darwin queue drain → JS events) lands in Week 5. See [Roadmap](#roadmap).
+> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) **and** runtime native module (Darwin observer → queue drain → JS events) are both complete. End-to-end validated. Remaining for v0.1: full SF Symbol set, `useControlState` polish, example apps. See [Roadmap](#roadmap).
 
 ---
 
@@ -236,7 +236,7 @@ to draw itself) and **action** (when the user actually taps the toggle).
 
 ## Status
 
-Week 4 (May 2026) — **end-to-end working in a real Expo project** ✅ &nbsp; · &nbsp; **120 tests passing**
+Week 5 (May 2026) — **runtime native module complete; build + runtime now connected end-to-end** ✅ &nbsp; · &nbsp; **120 tests passing**
 
 What works today:
 
@@ -247,9 +247,12 @@ What works today:
 - [x] `wireXcodeProject()` — mutates `project.pbxproj` to add the widget target, link frameworks, register the synced folder + ExceptionSets, and apply build settings on both targets
 - [x] **Expo Config Plugin** (`plugin/index.ts`) wires the entire pipeline into `expo prebuild`
 - [x] **Standalone CLI** (`npx rn-control-center generate`) runs the same pipeline for bare RN CLI projects
-- [x] **End-to-end validated:** in a real Expo app, `expo prebuild` produces a project that builds with `xcodebuild`, the control shows up in iOS Control Center, and tapping it opens the main app — the failure mode that bacons-based setups hit because they couldn't put the AppIntent in both targets is solved here by the ExceptionSet flow
+- [x] **End-to-end build validated:** in a real Expo app, `expo prebuild` produces a project that builds with `xcodebuild`, the control shows up in iOS Control Center, and tapping it opens the main app — the failure mode that bacons-based setups hit because they couldn't put the AppIntent in both targets is solved here by the ExceptionSet flow
+- [x] **Native Module** (`ios/RNControlCenter.swift` + `.mm`) — Darwin notification observer with `Unmanaged` pointer trick, cold-start queue drain, App Group `UserDefaults` get/set exposed to JS via Promise. Legacy Bridge (`RCT_EXTERN_MODULE`); TurboModule migration planned for v0.2
+- [x] **`.podspec`** — CocoaPods integration; library autolinks into a consumer RN app's `pod install`
+- [x] **JS wrapper** (`src/ControlCenter.ts`) — `NativeEventEmitter` over the native module; `onAction` / `onStateChange` event subscriptions, `getState` / `setState` Promise-based; safe no-op on Android and pre-iOS-18
 
-Coming in Weeks 5–8: native module (Darwin observer + queue drain to JS), `ControlCenter.onAction` and `useControlState` runtime, full SF Symbol set, example apps, and v0.1 publish.
+Coming in Weeks 6–8: full SF Symbol set, `useControlState` polish (sync initial via cache + widget reload via `WidgetCenter.reloadControls`), example apps, simulator tests, and v0.1 publish.
 
 ---
 
@@ -261,7 +264,7 @@ Coming in Weeks 5–8: native module (Darwin observer + queue drain to JS), `Con
 | 2 | Toggle template + ControlStore runtime + Info.plist / entitlement generation | ✅ |
 | 3 | pbxproj target wiring (target add, framework link, membership, build settings) | ✅ |
 | 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | ✅ |
-| 5 | Native Module (Darwin notifications + App Group UserDefaults) | — |
+| 5 | Native Module (Darwin notifications + App Group UserDefaults) | ✅ |
 | 6 | Full SF Symbol set + `useControlState` runtime | — |
 | 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests | — |
 | 8 | Documentation + npm publish (v0.1) | — |
