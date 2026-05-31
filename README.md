@@ -236,6 +236,21 @@ to draw itself) and **action** (when the user actually taps the toggle).
 
 ## Status
 
+Week 7 (May 2026) — **Expo example app + xcodebuild compile E2E; native module now actually links in a consumer app** ✅ &nbsp; · &nbsp; **138 tests passing**
+
+What Week 7 added / fixed:
+
+- [x] **Expo example** under [`examples/expo`](examples/expo) — `onAction` button log + `useControlState` toggle, wired through `app.json`
+- [x] **xcodebuild compile E2E** — the generated widget extension **and** the full host app build against the real iOS 18 SDK (Control Center taps can't be UI-automated, so a real compile/link is the meaningful automated check). This surfaced three bugs that 138 jest tests could not:
+  - **Swift module boundary:** the native module ships in the **Pod** module but referenced `ControlStore`, which codegen emits into the **app** module — `cannot find 'ControlStore' in scope`. Fixed by shipping a Pod-side [`ControlStoreRuntime`](ios/ControlStoreRuntime.swift) that reads the App Group id + state keys from the main-app `Info.plist` (injected by the plugin/CLI), so app and widget share the same suite/queue without crossing modules.
+  - **`hasListeners`** is not a public `RCTEventEmitter` member — replaced with a tracked flag.
+  - **Podspec deployment target** (`16.0`) was higher than RN 0.81 / Expo 54 (`15.1`), so CocoaPods refused to integrate; the only iOS-18 call is `#available`-guarded, so it's lowered to `15.1`.
+- [x] **`package.json` `main`/`types`** pointed at builder-bob paths that the plain-`tsc` build never produced — corrected to `lib/commonjs/src/...` so consumers resolve the package
+
+---
+
+## Earlier status
+
 Week 6 (May 2026) — **runtime hook polished + full SF Symbol set with build-time validation** ✅ &nbsp; · &nbsp; **136 tests passing**
 
 What works today:
@@ -254,7 +269,7 @@ What works today:
 - [x] **`.podspec`** — CocoaPods integration; library autolinks into a consumer RN app's `pod install`
 - [x] **JS wrapper** (`src/ControlCenter.ts`) — `NativeEventEmitter` over the native module; `onAction` / `onStateChange` event subscriptions, `getState` / `setState` Promise-based; safe no-op on Android and pre-iOS-18
 
-Coming in Weeks 7–8: example apps (Expo + RN CLI), end-to-end simulator tests, and v0.1 publish.
+Coming in Week 8: documentation polish, an RN CLI example to mirror the Expo one, and v0.1 npm publish.
 
 ---
 
@@ -268,7 +283,7 @@ Coming in Weeks 7–8: example apps (Expo + RN CLI), end-to-end simulator tests,
 | 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | ✅ |
 | 5 | Native Module (Darwin notifications + App Group UserDefaults) | ✅ |
 | 6 | Full SF Symbol set + validation + `useControlState` runtime (cache + reload) | ✅ |
-| 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests | — |
+| 7 | Expo example app + xcodebuild compile E2E (host app + extension link on real SDK) | ✅ |
 | 8 | Documentation + npm publish (v0.1) | — |
 
 v0.2+: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, dynamic intents.
@@ -283,7 +298,7 @@ cd react-native-control-center
 npm install --legacy-peer-deps
 
 npm run typecheck   # tsc --noEmit
-npm test            # jest, 136 tests
+npm test            # jest, 138 tests
 ```
 
 The repo is structured as a publishable RN library plus the tooling that backs it:
