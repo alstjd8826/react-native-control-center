@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "ControlCenterExample",
+    "slug": "control-center-example",
+    "version": "1.0.0",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.controlcenter"
+    },
+    "plugins": [
+      [
+        "react-native-control-center",
+        {
+          "controls": "./src/controls.ts",
+          "urlScheme": "ccexample"
+        }
+      ]
+    ]
+  }
+}

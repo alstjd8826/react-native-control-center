@@ -1,9 +1,11 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
+import * as plist from 'plist';
+
 import { parseControlsFile } from '../core/parseControls';
 import { warnUnknownSymbols } from '../core/validateSymbols';
-import { generateNativeFiles } from '../core/generate';
+import { generateNativeFiles, collectStateKeys, defaultAppGroupId } from '../core/generate';
 import { wireXcodeProject } from '../core/xcode/wire';
 import { loadProject } from '../core/xcode/inspect';
 import { deriveSharedFiles } from '../plugin';
@@ -86,6 +88,14 @@ export function runGenerate(opts: RunGenerateOptions = {}): RunGenerateResult {
     filesWritten.push(fullPath);
   }
 
+  // 2b) 메인 앱 Info.plist에 런타임 스토어용 키 주입 (Expo 플러그인과 동일).
+  //     Native Module(Pod)이 App Group ID / stateKeys를 여기서 읽는다.
+  const appGroupId = config.appGroupId ?? defaultAppGroupId(bundleId);
+  injectMainAppInfoPlistKeys(iosRoot, pbxprojPath, {
+    RNControlCenterAppGroup: appGroupId,
+    RNControlCenterStateKeys: collectStateKeys(controls),
+  });
+
   // 3) Wire pbxproj
   const project = loadProject(pbxprojPath);
   const sharedFiles = deriveSharedFiles(files, extensionName);
@@ -138,6 +148,26 @@ function findPbxprojPath(iosRoot: string): string {
     throw new Error(`[rn-control-center] No *.xcodeproj found inside ${iosRoot}.`);
   }
   return path.join(iosRoot, xcodeproj, 'project.pbxproj');
+}
+
+/**
+ * 메인 앱 타겟의 Info.plist에 키를 병합 저장.
+ * bare RN 레이아웃은 ios/<AppName>/Info.plist (AppName = .xcodeproj 이름).
+ * Info.plist를 못 찾으면 조용히 건너뛴다 (라이브러리가 빌드를 막지 않도록).
+ */
+function injectMainAppInfoPlistKeys(
+  iosRoot: string,
+  pbxprojPath: string,
+  keys: Record<string, unknown>
+): void {
+  // pbxprojPath = ios/<App>.xcodeproj/project.pbxproj → <App> 추출
+  const appName = path.basename(path.dirname(pbxprojPath)).replace(/\.xcodeproj$/, '');
+  const plistPath = path.join(iosRoot, appName, 'Info.plist');
+  if (!fs.existsSync(plistPath)) return;
+
+  const parsed = plist.parse(fs.readFileSync(plistPath, 'utf-8')) as plist.PlistObject;
+  const merged = { ...parsed, ...keys } as plist.PlistObject;
+  fs.writeFileSync(plistPath, plist.build(merged));
 }
 
 function readBundleIdFromInfoPlist(iosRoot: string): string {

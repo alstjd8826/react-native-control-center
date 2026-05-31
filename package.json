@@ -2,9 +2,8 @@
   "name": "react-native-control-center",
   "version": "0.0.1",
   "description": "iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.",
-  "main": "lib/commonjs/index.js",
-  "module": "lib/module/index.js",
-  "types": "lib/typescript/src/index.d.ts",
+  "main": "lib/commonjs/src/index.js",
+  "types": "lib/commonjs/src/index.d.ts",
   "react-native": "src/index.ts",
   "source": "src/index.ts",
   "files": [

@@ -1,11 +1,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ConfigPlugin } from '@expo/config-plugins';
-import { withDangerousMod, withXcodeProject } from '@expo/config-plugins';
+import { withDangerousMod, withXcodeProject, withInfoPlist } from '@expo/config-plugins';
 
 import { parseControlsFile } from '../core/parseControls';
 import { warnUnknownSymbols } from '../core/validateSymbols';
-import { generateNativeFiles } from '../core/generate';
+import { generateNativeFiles, collectStateKeys } from '../core/generate';
+import { defaultAppGroupId } from '../core/generate/swift';
 import { wireXcodeProject } from '../core/xcode/wire';
 import type { ParsedControl } from '../core/types';
 import type { NativeFile } from '../core/generate';
@@ -73,6 +74,28 @@ const withControlCenter: ConfigPlugin<ControlCenterPluginProps> = (config, props
       return cfg;
     },
   ]);
+
+  // Step 1b: 메인 앱 Info.plist에 런타임 스토어가 읽을 키를 주입한다.
+  //   Native Module(Pod 모듈)은 생성된 ControlStore(앱 모듈)를 볼 수 없으므로
+  //   App Group ID와 stateKey 목록을 Info.plist를 통해 전달한다. 값은 codegen이
+  //   쓰는 것과 정확히 동일해야 양쪽이 같은 사물함/큐를 바라본다.
+  config = withInfoPlist(config, (cfg) => {
+    const bundleId = cfg.ios?.bundleIdentifier;
+    if (!bundleId) return cfg; // 상단에서 이미 검증됨 — 방어적 처리
+
+    const appGroupId = props.appGroupId ?? defaultAppGroupId(bundleId);
+
+    let controls = cachedControls;
+    if (!controls) {
+      // mod 실행 순서가 dangerous mod보다 앞설 경우를 대비해 한 번 더 파싱.
+      const controlsAbs = path.resolve(cfg.modRequest.projectRoot, props.controls);
+      controls = fs.existsSync(controlsAbs) ? parseControlsFile(controlsAbs) : [];
+    }
+
+    cfg.modResults['RNControlCenterAppGroup'] = appGroupId;
+    cfg.modResults['RNControlCenterStateKeys'] = collectStateKeys(controls);
+    return cfg;
+  });
 
   // Step 2: pbxproj 변형 — wireXcodeProject 호출.
   config = withXcodeProject(config, (cfg) => {

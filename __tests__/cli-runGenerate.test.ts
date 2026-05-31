@@ -71,6 +71,14 @@ export default defineControls({
 });
 `;
 
+const buttonAndToggleControls = `
+import { defineControls } from 'react-native-control-center';
+export default defineControls({
+  quickNote: { type: 'button', title: 'Quick Note', icon: 'square.and.pencil' },
+  vpn: { type: 'toggle', title: 'VPN', icons: { on: 'lock.fill', off: 'lock.open' }, stateKey: 'vpnEnabled' },
+});
+`;
+
 describe('runGenerate (RN CLI)', () => {
   it('generates files and modifies pbxproj end-to-end', () => {
     withTempBareProject({
@@ -101,6 +109,31 @@ describe('runGenerate (RN CLI)', () => {
         expect(pbxStat.size).toBeGreaterThan(0);
         const pbxText = fs.readFileSync(result.pbxprojPath, 'utf-8');
         expect(pbxText).toContain('ControlCenterExtension');
+      },
+    });
+  });
+
+  it('injects runtime store keys into the main app Info.plist', () => {
+    withTempBareProject({
+      controlsTs: buttonAndToggleControls,
+      bundleId: 'com.demo.app',
+      packageRnControlCenter: {
+        controls: './src/controls.ts',
+        urlScheme: 'demo',
+      },
+      fn: (projectRoot) => {
+        runGenerate({ projectRoot });
+        const infoPlist = fs.readFileSync(
+          path.join(projectRoot, 'ios', 'QuickNote', 'Info.plist'),
+          'utf-8'
+        );
+        // Native Module(Pod)이 읽을 App Group + stateKeys가 들어갔는지
+        expect(infoPlist).toContain('RNControlCenterAppGroup');
+        expect(infoPlist).toContain('group.com.demo.app.controls');
+        expect(infoPlist).toContain('RNControlCenterStateKeys');
+        expect(infoPlist).toContain('vpnEnabled');
+        // 토글의 stateKey만 — 버튼은 stateKey가 없으므로 빠져야 함
+        expect(infoPlist).not.toContain('quickNote</string>');
       },
     });
   });

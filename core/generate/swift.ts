@@ -15,6 +15,18 @@ export function defaultAppGroupId(bundleId: string): string {
   return `group.${bundleId}.controls`;
 }
 
+/**
+ * 토글 컨트롤들의 stateKey 목록.
+ * - 생성된 ControlStore.swift의 정적 화이트리스트로 박힘
+ * - Native Module의 snapshot() 정제를 위해 메인 앱 Info.plist
+ *   ("RNControlCenterStateKeys")로도 주입됨
+ */
+export function collectStateKeys(controls: ParsedControl[]): string[] {
+  return controls
+    .filter((c): c is Extract<ParsedControl, { type: 'toggle' }> => c.type === 'toggle')
+    .map((c) => c.stateKey);
+}
+
 export interface GeneratedFile {
   path: string;     // 상대 경로 (예: "Controls/QuickNoteControl.swift")
   content: string;
@@ -66,9 +78,7 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
   // 1b. ControlStore (shared between targets)
   //  토글의 stateKey 목록을 정적으로 박아넣어, snapshot()이 시스템 전역 키를
   //  긁지 않고 우리가 관리하는 상태 키만 정확히 반환하게 한다. (Week 6)
-  const stateKeys = opts.controls
-    .filter((c): c is Extract<ParsedControl, { type: 'toggle' }> => c.type === 'toggle')
-    .map((c) => c.stateKey);
+  const stateKeys = collectStateKeys(opts.controls);
   files.push({
     path: 'ControlStore.swift',
     content: loadTemplate('ControlStore.swift')({ appGroupId, stateKeys }),

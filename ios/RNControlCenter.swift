@@ -44,7 +44,7 @@ class RNControlCenter: RCTEventEmitter {
   // 값을 동기로 쓸 수 있도록 현재 상태 스냅샷을 미리 넘긴다.
 
   @objc override func constantsToExport() -> [AnyHashable: Any]! {
-    return ["initialState": ControlStore.shared.snapshot()]
+    return ["initialState": ControlStoreRuntime.shared.snapshot()]
   }
 
   // MARK: - Lifecycle hooks
@@ -56,7 +56,12 @@ class RNControlCenter: RCTEventEmitter {
   // 중간 listener 변동(2개째 추가, 1개 제거 후에도 남음 등)은 RN이 내부적으로 처리하고
   // 여기로 호출하지 않는다. 우리는 0→1, 1→0 전환만 신경 쓰면 됨.
 
+  // RCTEventEmitter는 공개 `hasListeners`를 제공하지 않으므로 직접 추적한다.
+  // RN이 startObserving(0→1) / stopObserving(1→0)만 호출하므로 이 플래그로 충분.
+  private var hasAnyListeners = false
+
   override func startObserving() {
+    hasAnyListeners = true
     registerDarwinObserver()
 
     // ⚠️ 중요 — 앱이 죽어있다 위젯 탭으로 깬 시나리오를 위해 미리 한 번 drain.
@@ -65,6 +70,7 @@ class RNControlCenter: RCTEventEmitter {
   }
 
   override func stopObserving() {
+    hasAnyListeners = false
     unregisterDarwinObserver()
   }
 
@@ -105,7 +111,7 @@ class RNControlCenter: RCTEventEmitter {
           module.drainQueueAndSendEvents()
         }
       },
-      ControlStore.darwinNotificationName as CFString,  // 들을 채널 이름
+      ControlStoreRuntime.shared.darwinNotificationName as CFString,  // 들을 채널 이름
       nil,                                              // object filter (안 씀)
       .deliverImmediately
     )
@@ -122,7 +128,7 @@ class RNControlCenter: RCTEventEmitter {
     CFNotificationCenterRemoveObserver(
       center,
       observer,
-      CFNotificationName(ControlStore.darwinNotificationName as CFString),
+      CFNotificationName(ControlStoreRuntime.shared.darwinNotificationName as CFString),
       nil
     )
 
@@ -139,7 +145,7 @@ class RNControlCenter: RCTEventEmitter {
   @objc func getState(_ key: String,
                       resolver resolve: @escaping RCTPromiseResolveBlock,
                       rejecter reject: @escaping RCTPromiseRejectBlock) {
-    let value = ControlStore.shared.getBool(key)
+    let value = ControlStoreRuntime.shared.getBool(key)
     resolve(value)
   }
 
@@ -151,7 +157,7 @@ class RNControlCenter: RCTEventEmitter {
                       resolver resolve: @escaping RCTPromiseResolveBlock,
                       rejecter reject: @escaping RCTPromiseRejectBlock) {
     // 1) 공유 저장소에 값 먼저 쓴다 (위젯이 다음 렌더링 때 이 값을 읽음).
-    ControlStore.shared.setBool(key, value: value)
+    ControlStoreRuntime.shared.setBool(key, value: value)
 
     // 2) iOS에 "제어센터 컨트롤 다시 그려!" 요청. (Week 6)
     //    이게 없으면 앱에서 setState로 값을 바꿔도 제어센터 토글은
@@ -168,20 +174,20 @@ class RNControlCenter: RCTEventEmitter {
   // ControlStore의 두 종류 큐(action / stateChange)를 비우고
   // 각 이벤트를 supportedEvents에 등록된 이름으로 JS에 발사.
   //
-  // hasListeners 가드: JS가 안 듣고 있으면 큐를 만지지 않는다.
+  // hasAnyListeners 가드: JS가 안 듣고 있으면 큐를 만지지 않는다.
   // 안 만지면 다음 listener가 등록될 때 startObserving 안에서 drain됨.
 
   private func drainQueueAndSendEvents() {
-    guard hasListeners else { return }
+    guard hasAnyListeners else { return }
 
     // 1) Button 탭 큐
-    let actions = ControlStore.shared.dequeueActionEvents()
+    let actions = ControlStoreRuntime.shared.dequeueActionEvents()
     for action in actions {
       sendEvent(withName: "ControlAction", body: action)
     }
 
     // 2) Toggle 변경 큐
-    let stateChanges = ControlStore.shared.dequeueStateChangeEvents()
+    let stateChanges = ControlStoreRuntime.shared.dequeueStateChangeEvents()
     for change in stateChanges {
       sendEvent(withName: "ControlStateChange", body: change)
     }

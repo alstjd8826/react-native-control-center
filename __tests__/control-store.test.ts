@@ -1,4 +1,4 @@
-import { generateSwiftFiles, defaultAppGroupId } from '../core/generate/swift';
+import { generateSwiftFiles, defaultAppGroupId, collectStateKeys } from '../core/generate/swift';
 import type { ParsedControl } from '../core/types';
 
 const baseButton: ParsedControl = {
@@ -94,6 +94,14 @@ describe('ControlStore.swift generation', () => {
       'public static let stateKeys: [String] = ["vpnEnabled", "wifiEnabled"]'
     );
     expect(store.content).toContain('public func snapshot() -> [String: Any]');
+  });
+
+  it('collectStateKeys returns only toggle stateKeys, in order', () => {
+    expect(collectStateKeys([baseButton, vpnToggle, wifiToggle])).toEqual([
+      'vpnEnabled',
+      'wifiEnabled',
+    ]);
+    expect(collectStateKeys([baseButton])).toEqual([]);
   });
 
   it('produces an empty stateKeys list when there are no toggles', () => {

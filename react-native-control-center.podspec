@@ -12,10 +12,11 @@ Pod::Spec.new do |s|
   s.authors      = package['author']
 
   # 메인 앱이 동작할 최소 iOS 버전.
-  # Control Center 위젯 자체는 iOS 18+ 에서만 보이지만,
-  # Native Module은 iOS 16+ 메인 앱이라면 정상 로드된다.
+  # Control Center 위젯 자체는 iOS 18+ 에서만 보이지만, Native Module의 iOS 18
+  # API(ControlCenter.reloadAllControls)는 #available로 가드되어 있어 더 낮은
+  # 타겟에서도 안전하게 빌드/로드된다. RN 0.81 / Expo SDK 54 기본값(15.1)에 맞춤.
   # (iOS 17 이하에선 위젯이 안 보일 뿐, 라이브러리 import는 에러 없이 동작)
-  s.platforms    = { :ios => '16.0' }
+  s.platforms    = { :ios => '15.1' }
 
   s.source       = {
     :git => 'https://github.com/alstjd8826/react-native-control-center.git',

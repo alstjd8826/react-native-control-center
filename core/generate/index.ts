@@ -1,4 +1,4 @@
-import { generateSwiftFiles, defaultAppGroupId, type GeneratedFile } from './swift';
+import { generateSwiftFiles, defaultAppGroupId, collectStateKeys, type GeneratedFile } from './swift';
 import { generateExtensionInfoPlist } from './plist';
 import { generateAppGroupEntitlements } from './entitlements';
 import type { ParsedControl } from '../types';
@@ -84,5 +84,5 @@ function isSharedSwiftFile(swiftPath: string): boolean {
   return swiftPath === 'ControlStore.swift' || swiftPath.startsWith('Intents/');
 }
 
-export { defaultAppGroupId };
+export { defaultAppGroupId, collectStateKeys };
 export type { GeneratedFile };
