@@ -2,6 +2,12 @@
   "name": "react-native-control-center",
   "version": "0.1.0",
   "description": "iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/alstjd8826/react-native-control-center.git"
+  },
+  "homepage": "https://github.com/alstjd8826/react-native-control-center#readme",
+  "bugs": "https://github.com/alstjd8826/react-native-control-center/issues",
   "main": "lib/commonjs/src/index.js",
   "types": "lib/commonjs/src/index.d.ts",
   "react-native": "src/index.ts",
