@@ -2,9 +2,9 @@
 
 iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.
 
-![status](https://img.shields.io/badge/status-WIP_v0.0.1-orange) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-v0.1.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
-> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) **and** runtime native module (Darwin observer → queue drain → JS events) are both complete. End-to-end validated. The runtime hook is now polished — synchronous initial state via a cache + cold-start native snapshot, and Control Center re-render on programmatic state change. Full SF Symbol set (5,000+) backs build-time spell-check. Remaining for v0.1: example apps + simulator tests + npm publish. See [Roadmap](#roadmap).
+> **v0.1.0.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) and runtime native module (Darwin observer → queue drain → JS events) are complete and compile end-to-end against the real iOS 18 SDK. The runtime hook gives synchronous initial state via a cache and re-renders Control Center on programmatic state change; a 5,000+ SF Symbol set backs build-time spell-check. See [Installation](#installation) and the [Roadmap](#roadmap).
 
 ---
 
@@ -69,6 +69,48 @@ const [isVPN, setVPN] = useControlState<boolean>('vpnEnabled');
 ```
 
 ---
+
+## Requirements
+
+| | Minimum |
+| --- | --- |
+| iOS (controls visible) | **18.0+** — on iOS 17 and below the library loads and no-ops; controls just don't appear |
+| Xcode | **16+** (ships the iOS 18 SDK with `ControlWidget` / WidgetKit `ControlCenter`) |
+| React Native | **0.74+** |
+| Expo (optional) | **SDK 54+** if you use the config plugin |
+
+Android is a safe no-op today; a Quick Settings Tiles backend is planned (see [Roadmap](#roadmap)).
+
+## Installation
+
+```bash
+npm install react-native-control-center
+```
+
+**Expo** — add the config plugin to `app.json`, then prebuild:
+
+```json
+{ "expo": { "plugins": [["react-native-control-center", {
+  "controls": "./src/controls.ts",
+  "urlScheme": "myapp"
+}]] } }
+```
+
+```bash
+npx expo prebuild --clean && npx expo run:ios
+```
+
+**Bare React Native** — add a `rnControlCenter` block to `package.json`, then run the CLI:
+
+```json
+{ "rnControlCenter": { "controls": "./src/controls.ts", "urlScheme": "myapp" } }
+```
+
+```bash
+npx rn-control-center generate && cd ios && pod install && cd .. && npx react-native run-ios
+```
+
+See runnable references in [`examples/expo`](examples/expo) and [`examples/bare-rn`](examples/bare-rn).
 
 ## Why this exists
 
@@ -234,22 +276,70 @@ to draw itself) and **action** (when the user actually taps the toggle).
 
 ---
 
+## API
+
+### `defineControls(map)`
+
+Build-time only. Declares your controls as a literal object (literal values
+only — no variables or function calls, so codegen never runs your code).
+
+```ts
+defineControls({
+  quickNote: { type: 'button', title: 'Quick Note', icon: 'square.and.pencil', deepLink?, tint?, description? },
+  vpnToggle: { type: 'toggle', title: 'VPN', icons: { on, off }, stateKey: 'vpnEnabled', tint?, description? },
+});
+```
+
+### `ControlCenter`
+
+Runtime singleton. Safe no-op off iOS 18.
+
+| Member | Description |
+| --- | --- |
+| `isAvailable(): boolean` | `true` only on iOS 18+ with the native module loaded |
+| `onAction(cb): () => void` | Fires when a **button** is tapped; `cb({ id, deepLink?, t })`. Returns an unsubscribe fn |
+| `onStateChange<T>(key, cb): () => void` | Fires when a **toggle**'s `stateKey` changes. Returns an unsubscribe fn |
+| `getState<T>(key): Promise<T \| null>` | Read App Group state (returns `null` off iOS) |
+| `setState<T>(key, value): Promise<void>` | Write App Group state; reloads Control Center so the toggle re-renders |
+
+### `useControlState<T>(stateKey)`
+
+React hook over a toggle's state — `const [value, setValue] = useControlState<boolean>('vpnEnabled')`.
+First render is synchronous from a cache (no `null` flicker on cold start), then
+stays in sync with both in-app `setValue` calls and Control Center taps.
+
+## Troubleshooting
+
+- **Control doesn't appear in Control Center** — it's iOS 18+ only; add the
+  control via Control Center's edit screen (`+`). Confirm `expo prebuild` /
+  `rn-control-center generate` ran and the widget target is in your Xcode project.
+- **Toggle doesn't sync with the app** — both targets must share the App Group.
+  The plugin/CLI generate the entitlement and inject `RNControlCenterAppGroup`
+  into the app `Info.plist`; if you changed the bundle id, re-run generation.
+- **`cannot find 'ControlStore'` or App Group errors when building** — re-run
+  generation after changing controls, then `pod install`.
+- **An icon renders blank** — the build prints a warning for unknown SF Symbol
+  names; check the spelling in SF Symbols.app.
+
 ## Status
 
-Week 7 (May 2026) — **Expo example app + xcodebuild compile E2E; native module now actually links in a consumer app** ✅ &nbsp; · &nbsp; **138 tests passing**
+Week 8 (May 2026) — **v0.1.0 release prep — docs, license, examples, slimmed package** ✅ &nbsp; · &nbsp; **138 tests passing**
 
-What Week 7 added / fixed:
+What Week 8 added:
 
-- [x] **Expo example** under [`examples/expo`](examples/expo) — `onAction` button log + `useControlState` toggle, wired through `app.json`
-- [x] **xcodebuild compile E2E** — the generated widget extension **and** the full host app build against the real iOS 18 SDK (Control Center taps can't be UI-automated, so a real compile/link is the meaningful automated check). This surfaced three bugs that 138 jest tests could not:
-  - **Swift module boundary:** the native module ships in the **Pod** module but referenced `ControlStore`, which codegen emits into the **app** module — `cannot find 'ControlStore' in scope`. Fixed by shipping a Pod-side [`ControlStoreRuntime`](ios/ControlStoreRuntime.swift) that reads the App Group id + state keys from the main-app `Info.plist` (injected by the plugin/CLI), so app and widget share the same suite/queue without crossing modules.
-  - **`hasListeners`** is not a public `RCTEventEmitter` member — replaced with a tracked flag.
-  - **Podspec deployment target** (`16.0`) was higher than RN 0.81 / Expo 54 (`15.1`), so CocoaPods refused to integrate; the only iOS-18 call is `#available`-guarded, so it's lowered to `15.1`.
-- [x] **`package.json` `main`/`types`** pointed at builder-bob paths that the plain-`tsc` build never produced — corrected to `lib/commonjs/src/...` so consumers resolve the package
+- [x] **Docs** — Requirements, Installation, full API reference, and Troubleshooting sections (above)
+- [x] **`examples/bare-rn`** — RN CLI example mirroring the Expo one (`rnControlCenter` config + `rn-control-center generate`)
+- [x] **MIT `LICENSE`** file (the `license` field had no accompanying file)
+- [x] **Slimmer tarball** — `files` no longer ships the source `.ts` that the built `lib/` already provides (≈108 kB → 71 kB packed); native sources, templates, CLI bin, and types are all still included
+- [x] **`v0.1.0`** — `npm run build` + `npm pack` verified; `prepublishOnly` runs typecheck + tests + build
+
+> Publishing to npm (`npm publish`) is the one remaining manual, irreversible step — run it when you're logged in (`npm whoami`).
 
 ---
 
 ## Earlier status
+
+Week 7 (May 2026) — **Expo example + xcodebuild compile E2E** ✅ — a real host-app compile caught three bugs the JS tests couldn't: a Swift module boundary (native module in the Pod couldn't see the app-generated `ControlStore` → fixed with a Pod-side [`ControlStoreRuntime`](ios/ControlStoreRuntime.swift) reading config from `Info.plist`), a non-existent `hasListeners` member, and a too-high podspec deployment target. Also fixed `package.json` `main`/`types`.
 
 Week 6 (May 2026) — **runtime hook polished + full SF Symbol set with build-time validation** ✅ &nbsp; · &nbsp; **136 tests passing**
 
@@ -269,8 +359,6 @@ What works today:
 - [x] **`.podspec`** — CocoaPods integration; library autolinks into a consumer RN app's `pod install`
 - [x] **JS wrapper** (`src/ControlCenter.ts`) — `NativeEventEmitter` over the native module; `onAction` / `onStateChange` event subscriptions, `getState` / `setState` Promise-based; safe no-op on Android and pre-iOS-18
 
-Coming in Week 8: documentation polish, an RN CLI example to mirror the Expo one, and v0.1 npm publish.
-
 ---
 
 ## Roadmap
@@ -284,7 +372,7 @@ Coming in Week 8: documentation polish, an RN CLI example to mirror the Expo one
 | 5 | Native Module (Darwin notifications + App Group UserDefaults) | ✅ |
 | 6 | Full SF Symbol set + validation + `useControlState` runtime (cache + reload) | ✅ |
 | 7 | Expo example app + xcodebuild compile E2E (host app + extension link on real SDK) | ✅ |
-| 8 | Documentation + npm publish (v0.1) | — |
+| 8 | Documentation + RN CLI example + v0.1.0 release prep (publish = manual step) | ✅ |
 
 v0.2+: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, dynamic intents.
 
