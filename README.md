@@ -4,7 +4,7 @@ iOS 18+ Control Center custom controls for React Native — declare in TypeScrip
 
 ![status](https://img.shields.io/badge/status-WIP_v0.0.1-orange) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
-> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) **and** runtime native module (Darwin observer → queue drain → JS events) are both complete. End-to-end validated. Remaining for v0.1: full SF Symbol set, `useControlState` polish, example apps. See [Roadmap](#roadmap).
+> ⚠️ **Work in progress.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) **and** runtime native module (Darwin observer → queue drain → JS events) are both complete. End-to-end validated. The runtime hook is now polished — synchronous initial state via a cache + cold-start native snapshot, and Control Center re-render on programmatic state change. Full SF Symbol set (5,000+) backs build-time spell-check. Remaining for v0.1: example apps + simulator tests + npm publish. See [Roadmap](#roadmap).
 
 ---
 
@@ -236,11 +236,13 @@ to draw itself) and **action** (when the user actually taps the toggle).
 
 ## Status
 
-Week 5 (May 2026) — **runtime native module complete; build + runtime now connected end-to-end** ✅ &nbsp; · &nbsp; **120 tests passing**
+Week 6 (May 2026) — **runtime hook polished + full SF Symbol set with build-time validation** ✅ &nbsp; · &nbsp; **136 tests passing**
 
 What works today:
 
-- [x] `defineControls({...})` types + `~200` curated SF Symbols literal union
+- [x] `defineControls({...})` types + `~200` curated SF Symbols literal union (autocomplete)
+- [x] **Full SF Symbol set** (5,359 names, generated from [symbolist](https://github.com/marcbouchenoire/symbolist), MIT) — build-time spell-check warns on typos like `lock.filll` without blocking the build
+- [x] **`useControlState` polish** — synchronous initial value from a JS cache seeded by a native `initialState` constant (no first-render `null` flicker on cold start); programmatic `setState` calls `ControlCenter.shared.reloadAllControls()` so the Control Center toggle re-renders immediately
 - [x] Babel AST parser with literal-only policy and line-aware errors
 - [x] Handlebars templates for **Button** + **Toggle** controls, intents, and `ControlStore.swift`
 - [x] `generateNativeFiles()` — emits 8 Swift/plist/entitlement files tagged with target membership
@@ -252,7 +254,7 @@ What works today:
 - [x] **`.podspec`** — CocoaPods integration; library autolinks into a consumer RN app's `pod install`
 - [x] **JS wrapper** (`src/ControlCenter.ts`) — `NativeEventEmitter` over the native module; `onAction` / `onStateChange` event subscriptions, `getState` / `setState` Promise-based; safe no-op on Android and pre-iOS-18
 
-Coming in Weeks 6–8: full SF Symbol set, `useControlState` polish (sync initial via cache + widget reload via `WidgetCenter.reloadControls`), example apps, simulator tests, and v0.1 publish.
+Coming in Weeks 7–8: example apps (Expo + RN CLI), end-to-end simulator tests, and v0.1 publish.
 
 ---
 
@@ -265,7 +267,7 @@ Coming in Weeks 6–8: full SF Symbol set, `useControlState` polish (sync initia
 | 3 | pbxproj target wiring (target add, framework link, membership, build settings) | ✅ |
 | 4 | Expo Config Plugin + standalone CLI (`rn-control-center generate`) | ✅ |
 | 5 | Native Module (Darwin notifications + App Group UserDefaults) | ✅ |
-| 6 | Full SF Symbol set + `useControlState` runtime | — |
+| 6 | Full SF Symbol set + validation + `useControlState` runtime (cache + reload) | ✅ |
 | 7 | Example apps (Expo + RN CLI) and end-to-end simulator tests | — |
 | 8 | Documentation + npm publish (v0.1) | — |
 
@@ -281,7 +283,7 @@ cd react-native-control-center
 npm install --legacy-peer-deps
 
 npm run typecheck   # tsc --noEmit
-npm test            # jest, 120 tests
+npm test            # jest, 136 tests
 ```
 
 The repo is structured as a publishable RN library plus the tooling that backs it:
@@ -292,6 +294,7 @@ core/     → parser + codegen (shared by Expo plugin and CLI)
 plugin/   → Expo Config Plugin entry point
 cli/      → standalone `rn-control-center` binary
 ios/      → native module sources
+scripts/  → tooling (e.g. gen-sf-symbols.mjs regenerates the symbol list)
 ```
 
 ---
