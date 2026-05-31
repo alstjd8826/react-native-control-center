@@ -64,9 +64,14 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
   });
 
   // 1b. ControlStore (shared between targets)
+  //  토글의 stateKey 목록을 정적으로 박아넣어, snapshot()이 시스템 전역 키를
+  //  긁지 않고 우리가 관리하는 상태 키만 정확히 반환하게 한다. (Week 6)
+  const stateKeys = opts.controls
+    .filter((c): c is Extract<ParsedControl, { type: 'toggle' }> => c.type === 'toggle')
+    .map((c) => c.stateKey);
   files.push({
     path: 'ControlStore.swift',
-    content: loadTemplate('ControlStore.swift')({ appGroupId }),
+    content: loadTemplate('ControlStore.swift')({ appGroupId, stateKeys }),
   });
 
   // 2. Controls + Intents (컨트롤당 2파일)

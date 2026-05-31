@@ -8,6 +8,22 @@ const baseButton: ParsedControl = {
   icon: 'square.and.pencil',
 };
 
+const vpnToggle: ParsedControl = {
+  id: 'vpnToggle',
+  type: 'toggle',
+  title: 'VPN',
+  icons: { on: 'lock.fill', off: 'lock.open' },
+  stateKey: 'vpnEnabled',
+};
+
+const wifiToggle: ParsedControl = {
+  id: 'wifiToggle',
+  type: 'toggle',
+  title: 'Wi-Fi',
+  icons: { on: 'wifi', off: 'wifi.slash' },
+  stateKey: 'wifiEnabled',
+};
+
 describe('ControlStore.swift generation', () => {
   it('uses default app group id derived from bundle id', () => {
     expect(defaultAppGroupId('com.acme.app')).toBe('group.com.acme.app.controls');
@@ -63,6 +79,31 @@ describe('ControlStore.swift generation', () => {
     const store = files.find((f) => f.path === 'ControlStore.swift')!;
     expect(store.content).toContain('"__rncc.actionQueue"');
     expect(store.content).toContain('"__rncc.stateChangeQueue"');
+  });
+
+  // ─── Week 6: snapshot() for cold-start initial state ────────────────────
+
+  it('bakes the toggle stateKeys into a static whitelist', () => {
+    const files = generateSwiftFiles({
+      controls: [baseButton, vpnToggle, wifiToggle],
+      bundleId: 'com.acme.app',
+      urlScheme: 'acme',
+    });
+    const store = files.find((f) => f.path === 'ControlStore.swift')!;
+    expect(store.content).toContain(
+      'public static let stateKeys: [String] = ["vpnEnabled", "wifiEnabled"]'
+    );
+    expect(store.content).toContain('public func snapshot() -> [String: Any]');
+  });
+
+  it('produces an empty stateKeys list when there are no toggles', () => {
+    const files = generateSwiftFiles({
+      controls: [baseButton],
+      bundleId: 'com.acme.app',
+      urlScheme: 'acme',
+    });
+    const store = files.find((f) => f.path === 'ControlStore.swift')!;
+    expect(store.content).toContain('public static let stateKeys: [String] = []');
   });
 
   it('posts a Darwin notification on every enqueue', () => {

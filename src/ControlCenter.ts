@@ -1,4 +1,5 @@
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
+import { getCachedState, setCachedState, seedCache } from './stateCache';
 
 // ─────────────────────────────────────────────────────────────────────────
 //  ControlCenter — Native Module JS wrapper
@@ -13,6 +14,9 @@ const RNControlCenter = NativeModules.RNControlCenter as
   | {
       getState(key: string): Promise<unknown>;
       setState(key: string, value: unknown): Promise<void>;
+      // 네이티브가 모듈 등록 시점에 동기로 넘겨주는 상수.
+      // 콜드 스타트 직후에도 첫 렌더에서 바로 쓸 수 있는 초기 상태 스냅샷.
+      initialState?: Record<string, unknown>;
     }
   | undefined;
 
@@ -39,9 +43,29 @@ class ControlCenterAPI {
       // 자동으로 호출해 준다. addListener가 첫 등록되는 순간 Swift의
       // startObserving이 발사되고, 마지막 listener가 제거되면 stopObserving이 발사된다.
       this.emitter = new NativeEventEmitter(NativeModules.RNControlCenter);
+
+      // 콜드 스타트 시드 — 네이티브가 넘겨준 초기 스냅샷으로 캐시를 미리 채운다.
+      seedCache(RNControlCenter.initialState);
+
+      // 모든 ControlStateChange 이벤트를 캐시에 반영하는 내부 리스너.
+      // 키별 구독(onStateChange)과 별개로, 어떤 키가 바뀌든 캐시는 항상 최신.
+      this.emitter.addListener(
+        'ControlStateChange',
+        (event: ControlStateChangeEvent) => {
+          setCachedState(event.key, event.value);
+        }
+      );
     } else {
       this.emitter = null;
     }
+  }
+
+  /**
+   * 캐시된 마지막 값을 동기로 반환. 모르면 undefined.
+   * useControlState 훅이 첫 렌더 초기값으로 사용 (깜빡임 방지).
+   */
+  getCachedState<T>(key: string): T | undefined {
+    return getCachedState<T>(key);
   }
 
   /** 라이브러리가 현재 환경에서 실제로 동작 가능한지 (iOS + Native Module 로드됨). */
@@ -80,6 +104,7 @@ class ControlCenterAPI {
     if (!RNControlCenter) return null;
     try {
       const value = await RNControlCenter.getState(key);
+      setCachedState(key, value); // 응답을 캐시에 반영
       return value as T;
     } catch {
       return null;
@@ -88,6 +113,7 @@ class ControlCenterAPI {
 
   /** App Group UserDefaults에 값 쓰기. iOS 외에선 no-op. */
   async setState<T>(key: string, value: T): Promise<void> {
+    setCachedState(key, value); // optimistic — 네이티브 왕복 전에 캐시 먼저 갱신
     if (!RNControlCenter) return;
     await RNControlCenter.setState(key, value as unknown);
   }

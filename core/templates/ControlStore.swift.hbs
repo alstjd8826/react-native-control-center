@@ -68,6 +68,24 @@ public final class ControlStore {
         defaults.set(value, forKey: key)
     }
 
+    /// 라이브러리가 관리하는 toggle stateKey 목록 (codegen이 정적으로 주입).
+    /// dictionaryRepresentation()은 시스템 전역 도메인까지 섞여 나오므로
+    /// 우리가 선언한 키만 정확히 추리기 위해 이 화이트리스트를 쓴다.
+    public static let stateKeys: [String] = [{{#each stateKeys}}"{{this}}"{{#unless @last}}, {{/unless}}{{/each}}]
+
+    /// 선언된 stateKey들의 현재 값 스냅샷.
+    /// Native Module이 모듈 등록 시점에 JS로 넘겨, 콜드 스타트 직후에도
+    /// useControlState 첫 렌더에서 값을 동기로 쓸 수 있게 한다. (Week 6)
+    public func snapshot() -> [String: Any] {
+        var out: [String: Any] = [:]
+        for key in Self.stateKeys {
+            if let value = defaults.object(forKey: key) {
+                out[key] = value
+            }
+        }
+        return out
+    }
+
     // ─── 이벤트 큐 (Widget → App) ────────────────────────────────────────
     //  Button.perform()에서 enqueueAction()을 호출하면
     //   (1) UserDefaults 큐에 이벤트 push

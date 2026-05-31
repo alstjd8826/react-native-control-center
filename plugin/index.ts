@@ -4,6 +4,7 @@ import type { ConfigPlugin } from '@expo/config-plugins';
 import { withDangerousMod, withXcodeProject } from '@expo/config-plugins';
 
 import { parseControlsFile } from '../core/parseControls';
+import { warnUnknownSymbols } from '../core/validateSymbols';
 import { generateNativeFiles } from '../core/generate';
 import { wireXcodeProject } from '../core/xcode/wire';
 import type { ParsedControl } from '../core/types';
@@ -54,6 +55,7 @@ const withControlCenter: ConfigPlugin<ControlCenterPluginProps> = (config, props
       }
 
       cachedControls = parseControlsFile(controlsAbs);
+      warnUnknownSymbols(cachedControls); // 심볼 오타 경고 (빌드는 막지 않음)
       cachedFiles = generateNativeFiles({
         controls: cachedControls,
         bundleId,

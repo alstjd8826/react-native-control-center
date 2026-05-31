@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 
 import { parseControlsFile } from '../core/parseControls';
+import { warnUnknownSymbols } from '../core/validateSymbols';
 import { generateNativeFiles } from '../core/generate';
 import { wireXcodeProject } from '../core/xcode/wire';
 import { loadProject } from '../core/xcode/inspect';
@@ -64,6 +65,9 @@ export function runGenerate(opts: RunGenerateOptions = {}): RunGenerateResult {
     throw new Error(`[rn-control-center] controls file not found: ${controlsAbs}`);
   }
   const controls = parseControlsFile(controlsAbs);
+
+  // 1b) 심볼 오타 경고 (빌드는 막지 않음)
+  warnUnknownSymbols(controls);
 
   // 2) Generate files
   const files: NativeFile[] = generateNativeFiles({

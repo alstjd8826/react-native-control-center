@@ -1,5 +1,6 @@
 import Foundation
 import React
+import WidgetKit
 
 // ─────────────────────────────────────────────────────────────────────────
 //  📄  RNControlCenter.swift
@@ -34,6 +35,16 @@ class RNControlCenter: RCTEventEmitter {
 
   @objc override static func requiresMainQueueSetup() -> Bool {
     return false
+  }
+
+  // MARK: - 동기 상수 (Week 6)
+  //
+  // 모듈이 JS에 등록되는 시점에 한 번 평가되어 NativeModules.RNControlCenter에
+  // 프로퍼티로 붙는다. JS의 상태 캐시가 콜드 스타트 직후에도 첫 렌더부터
+  // 값을 동기로 쓸 수 있도록 현재 상태 스냅샷을 미리 넘긴다.
+
+  @objc override func constantsToExport() -> [AnyHashable: Any]! {
+    return ["initialState": ControlStore.shared.snapshot()]
   }
 
   // MARK: - Lifecycle hooks
@@ -139,7 +150,16 @@ class RNControlCenter: RCTEventEmitter {
                       value: Bool,
                       resolver resolve: @escaping RCTPromiseResolveBlock,
                       rejecter reject: @escaping RCTPromiseRejectBlock) {
+    // 1) 공유 저장소에 값 먼저 쓴다 (위젯이 다음 렌더링 때 이 값을 읽음).
     ControlStore.shared.setBool(key, value: value)
+
+    // 2) iOS에 "제어센터 컨트롤 다시 그려!" 요청. (Week 6)
+    //    이게 없으면 앱에서 setState로 값을 바꿔도 제어센터 토글은
+    //    옛날 그림 그대로 남아있다. WidgetKit의 ControlCenter API는 iOS 18+.
+    if #available(iOS 18.0, *) {
+      ControlCenter.shared.reloadAllControls()
+    }
+
     resolve(nil)
   }
 
