@@ -1,0 +1,13 @@
+{
+  "name": "control-center-bare-example",
+  "version": "1.0.0",
+  "private": true,
+  "comment": "이 발췌본은 react-native-control-center를 bare RN CLI 프로젝트에 붙일 때 package.json에 추가할 부분만 보여줍니다. Expo와 달리 app.json 플러그인 대신 'rnControlCenter' 키 + `rn-control-center generate` CLI를 씁니다.",
+  "dependencies": {
+    "react-native-control-center": "^0.1.0"
+  },
+  "rnControlCenter": {
+    "controls": "./src/controls.ts",
+    "urlScheme": "ccexample"
+  }
+}
