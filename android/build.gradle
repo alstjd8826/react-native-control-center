@@ -1,0 +1,50 @@
+// react-native-control-center — Android 라이브러리 모듈
+// autolinking이 이 build.gradle을 보고 소비자 앱의 Gradle 빌드에 포함한다.
+// 버전 값은 소비자 앱(RN 프로젝트)의 rootProject.ext를 우선 사용하고, 없으면 fallback.
+
+buildscript {
+    ext.safeExtGet = { prop, fallback ->
+        rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.1.1"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:${safeExtGet('kotlinVersion', '1.9.24')}"
+    }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+android {
+    namespace "com.rncontrolcenter"
+    compileSdkVersion safeExtGet("compileSdkVersion", 34)
+
+    defaultConfig {
+        minSdkVersion safeExtGet("minSdkVersion", 24)   // Quick Settings 타일 = API 24+
+        targetSdkVersion safeExtGet("targetSdkVersion", 34)
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+}
+
+repositories {
+    mavenCentral()
+    google()
+}
+
+dependencies {
+    // 소비자 앱이 제공하는 RN 안드로이드 아티팩트에 컴파일타임 의존.
+    implementation "com.facebook.react:react-android"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:${safeExtGet('kotlinVersion', '1.9.24')}"
+}

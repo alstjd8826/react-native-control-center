@@ -15,8 +15,10 @@ const RNControlCenter = NativeModules.RNControlCenter as
       getState(key: string): Promise<unknown>;
       setState(key: string, value: unknown): Promise<void>;
       // 네이티브가 모듈 등록 시점에 동기로 넘겨주는 상수.
-      // 콜드 스타트 직후에도 첫 렌더에서 바로 쓸 수 있는 초기 상태 스냅샷.
+      // 콜드 스타트 직후에도 첫 렌더에서 바로 쓸 수 있는 초기 상태 스냅샷. (iOS만)
       initialState?: Record<string, unknown>;
+      // Android: 타일이 쌓아둔 이벤트 큐를 비워 JS로 발사하도록 요청. (iOS엔 없음)
+      drain?(): Promise<void>;
     }
   | undefined;
 
@@ -40,13 +42,14 @@ class ControlCenterAPI {
   private emitter: NativeEventEmitter | null;
 
   constructor() {
-    if (Platform.OS === 'ios' && RNControlCenter) {
-      // NativeEventEmitter는 NativeModule을 받아 startObserving/stopObserving을
-      // 자동으로 호출해 준다. addListener가 첫 등록되는 순간 Swift의
-      // startObserving이 발사되고, 마지막 listener가 제거되면 stopObserving이 발사된다.
+    const supported = Platform.OS === 'ios' || Platform.OS === 'android';
+    if (supported && RNControlCenter) {
+      // iOS: addListener 첫 등록 시 Swift startObserving이 자동 호출됨.
+      // Android: 이벤트는 RCTDeviceEventEmitter로 오고, 큐 비우기는 drain()으로.
       this.emitter = new NativeEventEmitter(NativeModules.RNControlCenter);
 
-      // 콜드 스타트 시드 — 네이티브가 넘겨준 초기 스냅샷으로 캐시를 미리 채운다.
+      // 콜드 스타트 시드 — iOS는 네이티브 initialState 상수로 캐시를 미리 채운다.
+      // (Android 모듈은 이 상수가 없어 undefined → seedCache가 no-op)
       seedCache(RNControlCenter.initialState);
 
       // 모든 ControlStateChange 이벤트를 캐시에 반영하는 내부 리스너.
@@ -57,6 +60,10 @@ class ControlCenterAPI {
           setCachedState(event.key, event.value);
         }
       );
+
+      // Android: JS 리스너가 붙은 지금, 타일이 앱 실행 전에 쌓아둔 이벤트를 흘려보낸다.
+      // (iOS엔 drain이 없어 optional chaining으로 no-op)
+      void RNControlCenter.drain?.();
     } else {
       this.emitter = null;
     }
