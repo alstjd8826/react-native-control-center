@@ -1,8 +1,8 @@
 # react-native-control-center
 
-iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.
+iOS 18 Control Center controls **and** Android Quick Settings tiles for React Native — declare once in TypeScript, no Swift or Kotlin required.
 
-![status](https://img.shields.io/badge/status-v0.2.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-v0.3.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![Android](https://img.shields.io/badge/Android-7%2B%20(API%2024)-green) ![license](https://img.shields.io/badge/license-MIT-green)
 
 > **v0.1.0.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) and runtime native module (Darwin observer → queue drain → JS events) are complete and compile end-to-end against the real iOS 18 SDK. The runtime hook gives synchronous initial state via a cache and re-renders Control Center on programmatic state change; a 5,000+ SF Symbol set backs build-time spell-check. See [Installation](#installation) and the [Roadmap](#roadmap).
 
@@ -78,8 +78,9 @@ const [isVPN, setVPN] = useControlState<boolean>('vpnEnabled');
 | Xcode | **16+** (ships the iOS 18 SDK with `ControlWidget` / WidgetKit `ControlCenter`) |
 | React Native | **0.74+** |
 | Expo (optional) | **SDK 54+** if you use the config plugin |
+| Android (tiles) | **7.0+ (API 24)** — Quick Settings tiles; below that the library no-ops |
 
-Android is a safe no-op today; a Quick Settings Tiles backend is planned (see [Roadmap](#roadmap)).
+The same `defineControls` config drives both platforms.
 
 ## Installation
 
@@ -344,6 +345,26 @@ React hook over a toggle's state — `const [value, setValue] = useControlState<
 First render is synchronous from a cache (no `null` flicker on cold start), then
 stays in sync with both in-app `setValue` calls and Control Center taps.
 
+## Android (Quick Settings tiles)
+
+The same `defineControls` config also generates Android Quick Settings tiles —
+no separate config:
+
+| Control | Android tile |
+| --- | --- |
+| `button` | a tile that, on tap, fires `onAction` and opens the app via the deep link |
+| `toggle` | a tile with on/off state, kept in sync through `useControlState` / `onStateChange` |
+| `button` + `parameter` | the `parameter` is **iOS-only**; on Android it renders as a plain button tile |
+
+What the library does for you: generates a `TileService` per control, registers
+it in `AndroidManifest.xml`, ships the shared store + native module (autolinked),
+and registers your `urlScheme` so tiles can open the app.
+
+> **Adding tiles to the panel.** Android does not let an app force a tile into
+> the user's Quick Settings — the user adds it from the QS edit screen. (An
+> in-app `requestAddTile` prompt is on the roadmap.) Unlike iOS, tiles run in the
+> app process, so no App Group is needed.
+
 ## Troubleshooting
 
 - **Control doesn't appear in Control Center** — it's iOS 18+ only; add the
@@ -410,9 +431,11 @@ What works today:
 | 7 | Expo example app + xcodebuild compile E2E (host app + extension link on real SDK) | ✅ |
 | 8 | Documentation + RN CLI example + v0.1.0 release prep (publish = manual step) | ✅ |
 
+**v0.3.0:** Android Quick Settings tiles — the same `defineControls` config now generates `TileService`s (button + toggle), autolinks the Kotlin runtime, and registers the deep link scheme. Verified on an emulator (tile tap → `ControlStore`). ✅
+
 **v0.2.0:** dynamic intents — user-configurable button controls (a `parameter` with selectable options; the choice arrives in `onAction.params`). ✅
 
-Later: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, runtime/queried dynamic options.
+Later: in-app `requestAddTile` prompt, Lock Screen / Action Button control targets, runtime/queried dynamic options.
 
 ---
 

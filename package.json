@@ -1,7 +1,7 @@
 {
   "name": "react-native-control-center",
-  "version": "0.2.0",
-  "description": "iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.",
+  "version": "0.3.0",
+  "description": "iOS 18 Control Center controls and Android Quick Settings tiles for React Native — declare once in TypeScript, no Swift or Kotlin required.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/alstjd8826/react-native-control-center.git"
@@ -44,7 +44,12 @@
     "expo",
     "expo-config-plugin",
     "ios18",
-    "app-intents"
+    "app-intents",
+    "android",
+    "quick-settings",
+    "tile",
+    "quick-settings-tiles",
+    "cross-platform"
   ],
   "author": "darby <darby@glorang.com>",
   "license": "MIT",
