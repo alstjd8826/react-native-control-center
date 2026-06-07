@@ -23,7 +23,9 @@
     "!**/__tests__",
     "!**/__fixtures__",
     "!**/*.test.*",
-    "!**/.DS_Store"
+    "!**/.DS_Store",
+    "!android/build",
+    "!android/.gradle"
   ],
   "bin": {
     "rn-control-center": "cli/bin/rn-control-center.js"
