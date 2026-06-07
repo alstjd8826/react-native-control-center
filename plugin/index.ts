@@ -1,7 +1,13 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { ConfigPlugin } from '@expo/config-plugins';
-import { withDangerousMod, withXcodeProject, withInfoPlist } from '@expo/config-plugins';
+import {
+  withDangerousMod,
+  withXcodeProject,
+  withInfoPlist,
+  withAndroidManifest,
+  AndroidConfig,
+} from '@expo/config-plugins';
 
 import { parseControlsFile } from '../core/parseControls';
 import { warnUnknownSymbols } from '../core/validateSymbols';
@@ -126,6 +132,19 @@ const withControlCenter: ConfigPlugin<ControlCenterPluginProps> = (config, props
       }),
       ...(props.swiftVersion !== undefined && { swiftVersion: props.swiftVersion }),
     });
+    return cfg;
+  });
+
+  // Step 2b (Android): 딥링크 scheme을 메인 액티비티에 등록.
+  //   타일은 ACTION_VIEW(deepLink)로 앱을 여는데, iOS의 openAppWhenRun과 달리
+  //   Android는 scheme intent-filter가 없으면 "열 액티비티 없음"으로 실패한다.
+  config = withAndroidManifest(config, (cfg) => {
+    const scheme = props.urlScheme;
+    if (AndroidConfig.Scheme.ensureManifestHasValidIntentFilter(cfg.modResults)) {
+      if (!AndroidConfig.Scheme.hasScheme(scheme, cfg.modResults)) {
+        cfg.modResults = AndroidConfig.Scheme.appendScheme(scheme, cfg.modResults);
+      }
+    }
     return cfg;
   });
 
