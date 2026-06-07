@@ -69,3 +69,23 @@ describe('withControlCenter (skeleton)', () => {
     ).not.toThrow();
   });
 });
+
+describe('injectManifestServices (Android)', () => {
+  const { injectManifestServices } = require('../plugin');
+  const manifest = `<manifest><application android:name=".MainApp">
+    <activity android:name=".MainActivity" />
+  </application></manifest>`;
+  const services = `        <service android:name=".tiles.QuickNoteTileService" />`;
+
+  it('inserts services before </application>', () => {
+    const out = injectManifestServices(manifest, services);
+    expect(out).toContain('.tiles.QuickNoteTileService');
+    expect(out.indexOf('QuickNoteTileService')).toBeLessThan(out.indexOf('</application>'));
+  });
+
+  it('is idempotent (no duplication on re-run)', () => {
+    const once = injectManifestServices(manifest, services);
+    const twice = injectManifestServices(once, services);
+    expect(twice.split('QuickNoteTileService').length - 1).toBe(1);
+  });
+});
