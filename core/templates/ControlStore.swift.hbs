@@ -93,15 +93,17 @@ public final class ControlStore {
     //  메인 앱의 Native Module이 이 큐를 drain → JS 콜백 발화 (Week 5)
 
     /// Button intent에서 호출.
-    func enqueueAction(id: String, deepLink: String) {
-        appendToQueue(
-            key: Self.actionQueueKey,
-            event: [
-                "id": id,
-                "deepLink": deepLink,
-                "t": Date().timeIntervalSince1970,
-            ]
-        )
+    /// params: dynamic intent에서 사용자가 고른 값 (정적 버튼은 빈 dict 기본값).
+    func enqueueAction(id: String, deepLink: String, params: [String: String] = [:]) {
+        var event: [String: Any] = [
+            "id": id,
+            "deepLink": deepLink,
+            "t": Date().timeIntervalSince1970,
+        ]
+        if !params.isEmpty {
+            event["params"] = params
+        }
+        appendToQueue(key: Self.actionQueueKey, event: event)
         postDarwinNotification()
     }
 

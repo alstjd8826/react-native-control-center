@@ -152,4 +152,63 @@ describe('parseControls', () => {
       expect(() => parseControlsSource(source)).toThrow(/Failed to parse TypeScript/);
     });
   });
+
+  describe('dynamic intents (parameter)', () => {
+    it('parses a button with a configurable parameter', () => {
+      const source = `export default defineControls({
+        openPlace: {
+          type: 'button', title: 'Open Place', icon: 'mappin',
+          parameter: { key: 'place', title: 'Place', options: [
+            { value: 'home', label: 'Home' },
+            { value: 'work', label: 'Work' },
+          ] },
+        },
+      });`;
+      const controls = parseControlsSource(source);
+      expect(controls[0]).toMatchObject({
+        id: 'openPlace',
+        type: 'button',
+        parameter: {
+          key: 'place',
+          title: 'Place',
+          options: [
+            { value: 'home', label: 'Home' },
+            { value: 'work', label: 'Work' },
+          ],
+        },
+      });
+    });
+
+    it('still parses a button without a parameter (stays static)', () => {
+      const source = `export default defineControls({
+        plain: { type: 'button', title: 'Plain', icon: 'star' },
+      });`;
+      const controls = parseControlsSource(source);
+      expect(controls[0]).not.toHaveProperty('parameter');
+    });
+
+    it('throws when options array is empty', () => {
+      const source = `export default defineControls({
+        bad: { type: 'button', title: 'B', icon: 'star',
+          parameter: { key: 'k', title: 'T', options: [] } },
+      });`;
+      expect(() => parseControlsSource(source)).toThrow(/non-empty "options"/);
+    });
+
+    it('throws when an option is missing value/label', () => {
+      const source = `export default defineControls({
+        bad: { type: 'button', title: 'B', icon: 'star',
+          parameter: { key: 'k', title: 'T', options: [{ value: 'x' }] } },
+      });`;
+      expect(() => parseControlsSource(source)).toThrow(/requires string "value" and "label"/);
+    });
+
+    it('throws when key is not a string', () => {
+      const source = `export default defineControls({
+        bad: { type: 'button', title: 'B', icon: 'star',
+          parameter: { key: 123, title: 'T', options: [{ value: 'x', label: 'X' }] } },
+      });`;
+      expect(() => parseControlsSource(source)).toThrow(/parameter requires a string "key"/);
+    });
+  });
 });

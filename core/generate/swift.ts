@@ -60,6 +60,49 @@ export function pascalCase(str: string): string {
     .replace(/\s/g, '');
 }
 
+/**
+ * option.value(임의 문자열)를 Swift enum case로 쓸 안전한 식별자로 변환.
+ * 원래 value는 enum의 String raw value로 보존되므로 JS엔 그대로 전달된다.
+ * 예: "my-place" → "myPlace", "home" → "home", "2nd" → "_2nd"
+ */
+export function swiftCaseName(value: string): string {
+  let s = value
+    .replace(/[^A-Za-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+(.)/g, (_, c: string) => c.toUpperCase())
+    .replace(/\s/g, '');
+  if (!s) s = 'option';
+  s = s.charAt(0).toLowerCase() + s.slice(1);
+  if (/^[0-9]/.test(s)) s = `_${s}`;
+  return s;
+}
+
+interface ParameterModel {
+  enumName: string;
+  key: string;
+  title: string;
+  defaultCase: string;
+  options: { caseName: string; value: string; label: string }[];
+}
+
+/** dynamic intents — button.parameter를 템플릿이 쓰기 좋은 Swift 모델로 변환. */
+function buildParameterModel(control: ParsedControl): ParameterModel | undefined {
+  if (control.type !== 'button' || !control.parameter) return undefined;
+  const p = control.parameter;
+  const options = p.options.map((o) => ({
+    caseName: swiftCaseName(o.value),
+    value: o.value,
+    label: o.label,
+  }));
+  return {
+    enumName: `${pascalCase(control.id)}Option`,
+    key: p.key,
+    title: p.title,
+    defaultCase: options[0]!.caseName,
+    options,
+  };
+}
+
 export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
   registerHelpers();
   const bundleStructName = opts.bundleStructName ?? 'ControlCenterBundle';
@@ -87,11 +130,13 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
   // 2. Controls + Intents (컨트롤당 2파일)
   for (const control of opts.controls) {
     if (control.type === 'button') {
+      const parameterModel = buildParameterModel(control);
       files.push({
         path: `Controls/${pascalCase(control.id)}Control.swift`,
         content: loadTemplate('ButtonControl.swift')({
           ...control,
           bundleId: opts.bundleId,
+          parameterModel,
         }),
       });
       files.push({
@@ -99,6 +144,7 @@ export function generateSwiftFiles(opts: GenerateOptions): GeneratedFile[] {
         content: loadTemplate('ButtonIntent.swift')({
           ...control,
           deepLink: control.deepLink ?? `${opts.urlScheme}://control/${control.id}`,
+          parameterModel,
         }),
       });
     } else if (control.type === 'toggle') {

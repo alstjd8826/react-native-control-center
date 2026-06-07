@@ -1,4 +1,4 @@
-import type { KnownSFSymbol } from './sf-symbols';
+import type { KnownSFSymbol } from "./sf-symbols";
 
 export type HexColor = `#${string}`;
 
@@ -15,17 +15,26 @@ export type SFSymbolName = KnownSFSymbol | (string & {});
  */
 export type StrictSFSymbolName = KnownSFSymbol;
 
+export interface ControlParameter {
+  key: string;
+  title: string;
+  options: {
+    value: string;
+    label: string;
+  }[];
+}
 export interface ButtonControl {
-  type: 'button';
+  type: "button";
   title: string;
   icon: SFSymbolName;
   tint?: HexColor;
   description?: string;
   deepLink?: string;
+  parameter?: ControlParameter;
 }
 
 export interface ToggleControl {
-  type: 'toggle';
+  type: "toggle";
   title: string;
   icons: { on: SFSymbolName; off: SFSymbolName };
   tint?: { on: HexColor; off: HexColor };

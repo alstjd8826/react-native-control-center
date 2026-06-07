@@ -1,26 +1,84 @@
 import AppIntents
+import WidgetKit
 
 // ─────────────────────────────────────────────────────────────────────────
 //  📄  {{pascalCase id}}Intent.swift   (Intents/{{pascalCase id}}Intent.swift)
 //  Button 탭 → 앱 열림까지의 흐름
 // ─────────────────────────────────────────────────────────────────────────
+{{#if parameterModel}}
+//  이 버튼은 "사용자 구성" 컨트롤이다 (dynamic intent). 4부품:
+//    ① AppEnum         — 고를 수 있는 선택지
+//    ② ConfigIntent    — 제어센터 추가 시 사용자가 고르는 @Parameter
+//    ③ Provider        — 고른 값을 컨트롤 표시로 전달
+//    ④ ActionIntent    — 탭 시 실행, 고른 값을 enqueue → JS onAction.params 로 도착
+// ─────────────────────────────────────────────────────────────────────────
+
+// ① 선택지 — raw String 값이 JS로 그대로 전달된다
+enum {{parameterModel.enumName}}: String, AppEnum {
+    {{#each parameterModel.options}}
+    case {{caseName}} = "{{value}}"
+    {{/each}}
+
+    static var typeDisplayRepresentation: TypeDisplayRepresentation { "{{parameterModel.title}}" }
+    static var caseDisplayRepresentations: [{{parameterModel.enumName}}: DisplayRepresentation] {
+        [
+            {{#each parameterModel.options}}
+            .{{caseName}}: "{{label}}",
+            {{/each}}
+        ]
+    }
+}
+
+// ② 설정용 인텐트 — 사용자가 제어센터에 컨트롤 추가할 때 이 값을 고른다
+struct {{pascalCase id}}ConfigIntent: ControlConfigurationIntent {
+    static let title: LocalizedStringResource = "{{title}}"
+
+    @Parameter(title: "{{parameterModel.title}}", default: .{{parameterModel.defaultCase}})
+    var {{parameterModel.key}}: {{parameterModel.enumName}}
+
+    init() {}
+}
+
+// ③ 프로바이더 — 고른 값을 컨트롤 content 클로저로 넘긴다
+struct {{pascalCase id}}Provider: AppIntentControlValueProvider {
+    func previewValue(configuration: {{pascalCase id}}ConfigIntent) -> {{parameterModel.enumName}} {
+        configuration.{{parameterModel.key}}
+    }
+
+    func currentValue(configuration: {{pascalCase id}}ConfigIntent) async throws -> {{parameterModel.enumName}} {
+        configuration.{{parameterModel.key}}
+    }
+}
+
+// ④ 액션 인텐트 — 탭 시 실행. 고른 값을 params에 실어 enqueue.
+struct {{pascalCase id}}Intent: AppIntent {
+    static let title: LocalizedStringResource = "{{title}}"
+    static let openAppWhenRun: Bool = true
+
+    @Parameter(title: "{{parameterModel.title}}")
+    var {{parameterModel.key}}: {{parameterModel.enumName}}
+
+    init() {}
+    init({{parameterModel.key}}: {{parameterModel.enumName}}) {
+        self.{{parameterModel.key}} = {{parameterModel.key}}
+    }
+
+    func perform() async throws -> some IntentResult {
+        ControlStore.shared.enqueueAction(
+            id: "{{id}}",
+            deepLink: "{{deepLink}}",
+            params: ["{{parameterModel.key}}": {{parameterModel.key}}.rawValue]
+        )
+        return .result()
+    }
+}
+{{else}}
 //
 //  ① 사용자가 제어센터에서 "{{title}}" 버튼을 탭함
-//        ↓
 //  ② iOS가 위젯 익스텐션 프로세스를 깨워서 perform() 호출
-//        ↓
-//  ③ perform() 안에서:
-//       (a) ControlStore.shared.enqueueAction() 호출
-//             → App Group UserDefaults 큐에 이벤트 저장 (영구)
-//             → Darwin Notification 발송 (앱이 살아있으면 즉시 알림)
-//       (b) return .result()
-//        ↓
+//  ③ perform(): enqueueAction() → App Group 큐 저장 + Darwin 알림, return .result()
 //  ④ openAppWhenRun = true 이므로 iOS가 메인 앱을 포어그라운드로 띄움
-//        ↓
-//  ⑤ 메인 앱 시작/복귀 후 Native Module이 큐를 drain (Week 5에서 구현)
-//        ↓
-//  ⑥ JS의 ControlCenter.onAction((id) => { ... }) 콜백 발화
-//
+//  ⑤ 메인 앱 Native Module이 큐를 drain → JS onAction 콜백 발화
 // ─────────────────────────────────────────────────────────────────────────
 
 struct {{pascalCase id}}Intent: AppIntent {
@@ -28,12 +86,12 @@ struct {{pascalCase id}}Intent: AppIntent {
     static let openAppWhenRun: Bool = true   // ④ 이 플래그가 메인 앱을 깨움
 
     func perform() async throws -> some IntentResult {
-        // ③ (a): App Group 큐에 이벤트 기록 + Darwin 알림 발송
+        // ③: App Group 큐에 이벤트 기록 + Darwin 알림 발송
         ControlStore.shared.enqueueAction(
             id: "{{id}}",
             deepLink: "{{deepLink}}"
         )
-        // ③ (b): perform 종료. 이후 ④(앱 열기)는 iOS가 자동 처리
         return .result()
     }
 }
+{{/if}}

@@ -9,6 +9,7 @@ import type {
   CallExpression,
 } from '@babel/types';
 import { ParseError, type ParsedControl } from './types';
+import type { ControlParameter } from '../src/types';
 
 // @babel/traverse는 ESM/CJS 혼합 때문에 .default가 있을 수 있음
 const traverse =
@@ -192,6 +193,10 @@ function validateControl(
       ...(raw['tint'] !== undefined && { tint: raw['tint'] as `#${string}` }),
       ...(raw['description'] !== undefined && { description: raw['description'] as string }),
       ...(raw['deepLink'] !== undefined && { deepLink: raw['deepLink'] as string }),
+      // parameter는 구조가 복잡해서 전용 검증을 거친 뒤 넣는다 (dynamic intents).
+      ...(raw['parameter'] !== undefined && {
+        parameter: validateParameter(id, raw['parameter'], filePath),
+      }),
     };
   }
 
@@ -224,4 +229,48 @@ function validateControl(
 
 function missingField(id: string, field: string, filePath: string): ParseError {
   return new ParseError(`Control "${id}" is missing required field "${field}".`, filePath);
+}
+
+/**
+ * dynamic intents — 버튼의 parameter 블록 검증.
+ * objectExpressionToLiteral이 이미 평범한 JS 객체로 바꿔놨으므로,
+ * 여기선 "모양이 맞는지"만 확인하고 타입이 보장된 ControlParameter를 반환한다.
+ */
+function validateParameter(id: string, raw: unknown, filePath: string): ControlParameter {
+  if (typeof raw !== 'object' || raw === null) {
+    throw new ParseError(`Control "${id}" parameter must be an object.`, filePath);
+  }
+  const p = raw as Record<string, unknown>;
+
+  if (typeof p['key'] !== 'string') {
+    throw new ParseError(`Control "${id}" parameter requires a string "key".`, filePath);
+  }
+  if (typeof p['title'] !== 'string') {
+    throw new ParseError(`Control "${id}" parameter requires a string "title".`, filePath);
+  }
+  if (!Array.isArray(p['options']) || p['options'].length === 0) {
+    throw new ParseError(
+      `Control "${id}" parameter requires a non-empty "options" array.`,
+      filePath
+    );
+  }
+
+  const options = p['options'].map((opt, i) => {
+    if (typeof opt !== 'object' || opt === null) {
+      throw new ParseError(
+        `Control "${id}" parameter option #${i + 1} must be an object.`,
+        filePath
+      );
+    }
+    const o = opt as Record<string, unknown>;
+    if (typeof o['value'] !== 'string' || typeof o['label'] !== 'string') {
+      throw new ParseError(
+        `Control "${id}" parameter option #${i + 1} requires string "value" and "label".`,
+        filePath
+      );
+    }
+    return { value: o['value'], label: o['label'] };
+  });
+
+  return { key: p['key'], title: p['title'], options };
 }

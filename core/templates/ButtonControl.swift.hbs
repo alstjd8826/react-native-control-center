@@ -10,6 +10,26 @@ import WidgetKit
 
 struct {{pascalCase id}}Control: ControlWidget {
     var body: some ControlWidgetConfiguration {
+        {{#if parameterModel}}
+        // 사용자 구성 컨트롤 — 추가 시 iOS가 설정 화면을 띄우고,
+        // Provider가 고른 값(selection)을 여기로 넘겨 액션 인텐트에 주입한다.
+        AppIntentControlConfiguration(
+            kind: "{{bundleId}}.{{id}}",
+            provider: {{pascalCase id}}Provider()
+        ) { selection in
+            ControlWidgetButton(action: {{pascalCase id}}Intent({{parameterModel.key}}: selection)) {
+                Label("{{title}}", systemImage: "{{icon}}")
+                {{#if tint}}
+                    .tint(Color(hex: "{{tint}}"))
+                {{/if}}
+            }
+        }
+        .displayName("{{title}}")
+        {{#if description}}
+        .description("{{description}}")
+        {{/if}}
+        .promptsForUserConfiguration()
+        {{else}}
         StaticControlConfiguration(
             kind: "{{bundleId}}.{{id}}"
         ) {
@@ -23,6 +43,7 @@ struct {{pascalCase id}}Control: ControlWidget {
         .displayName("{{title}}")
         {{#if description}}
         .description("{{description}}")
+        {{/if}}
         {{/if}}
     }
 }

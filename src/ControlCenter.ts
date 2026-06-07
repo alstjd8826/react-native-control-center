@@ -23,6 +23,8 @@ const RNControlCenter = NativeModules.RNControlCenter as
 interface ControlActionEvent {
   id: string;
   deepLink?: string;
+  /** dynamic intent에서 사용자가 고른 값. 정적 버튼은 없음(undefined). */
+  params?: Record<string, string>;
   t: number;
 }
 
