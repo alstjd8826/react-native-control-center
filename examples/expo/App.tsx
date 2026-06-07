@@ -27,12 +27,15 @@ export default function App() {
 
   useEffect(() => {
     // 사용자가 제어센터에서 "빠른 메모" 버튼을 누르면 이 콜백이 실행된다.
-    const unsubscribe = ControlCenter.onAction(({ id, deepLink }) => {
+    const unsubscribe = ControlCenter.onAction(({ id, deepLink, params }) => {
       const stamp = new Date().toLocaleTimeString();
-      setActionLog((prev) => [
-        `${stamp}  ${id}${deepLink ? `  (${deepLink})` : ''}`,
-        ...prev,
-      ]);
+      // dynamic 버튼이면 사용자가 고른 값이 params에 담겨 옴 (예: { place: 'work' })
+      const extra = params
+        ? `  ${JSON.stringify(params)}`
+        : deepLink
+          ? `  (${deepLink})`
+          : '';
+      setActionLog((prev) => [`${stamp}  ${id}${extra}`, ...prev]);
     });
     return unsubscribe; // 언마운트 시 구독 해제
   }, []);

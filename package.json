@@ -1,6 +1,6 @@
 {
   "name": "react-native-control-center",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.",
   "repository": {
     "type": "git",

@@ -2,7 +2,7 @@
 
 iOS 18+ Control Center custom controls for React Native — declare in TypeScript, zero Swift required.
 
-![status](https://img.shields.io/badge/status-v0.1.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-v0.2.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![license](https://img.shields.io/badge/license-MIT-green)
 
 > **v0.1.0.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) and runtime native module (Darwin observer → queue drain → JS events) are complete and compile end-to-end against the real iOS 18 SDK. The runtime hook gives synchronous initial state via a cache and re-renders Control Center on programmatic state change; a 5,000+ SF Symbol set backs build-time spell-check. See [Installation](#installation) and the [Roadmap](#roadmap).
 
@@ -290,6 +290,42 @@ defineControls({
 });
 ```
 
+#### Dynamic (user-configurable) buttons
+
+Add a `parameter` to a button and it becomes **configurable**: when the user
+adds the control, iOS shows a picker of your declared `options`, and the chosen
+value arrives in `onAction` as `params`. One declaration covers many variants —
+the user can even add the same control multiple times with different values.
+
+```ts
+defineControls({
+  openPlace: {
+    type: 'button',
+    title: 'Open Place',
+    icon: 'mappin',
+    parameter: {
+      key: 'place',                 // arrives as params.place
+      title: 'Place',               // label shown in the iOS config screen
+      options: [
+        { value: 'home', label: 'Home' },
+        { value: 'work', label: 'Work' },
+        { value: 'gym',  label: 'Gym'  },
+      ],
+    },
+  },
+});
+```
+
+```ts
+ControlCenter.onAction(({ id, params }) => {
+  if (id === 'openPlace') navigate(params?.place); // 'home' | 'work' | 'gym'
+});
+```
+
+> Static vs dynamic: without `parameter` a button always does one thing; with
+> it, the value is chosen by the user at add-time (a fixed list you declare —
+> runtime/queried options are planned, not in 0.2.0).
+
 ### `ControlCenter`
 
 Runtime singleton. Safe no-op off iOS 18.
@@ -297,7 +333,7 @@ Runtime singleton. Safe no-op off iOS 18.
 | Member | Description |
 | --- | --- |
 | `isAvailable(): boolean` | `true` only on iOS 18+ with the native module loaded |
-| `onAction(cb): () => void` | Fires when a **button** is tapped; `cb({ id, deepLink?, t })`. Returns an unsubscribe fn |
+| `onAction(cb): () => void` | Fires when a **button** is tapped; `cb({ id, deepLink?, params?, t })`. `params` holds the chosen value for dynamic buttons. Returns an unsubscribe fn |
 | `onStateChange<T>(key, cb): () => void` | Fires when a **toggle**'s `stateKey` changes. Returns an unsubscribe fn |
 | `getState<T>(key): Promise<T \| null>` | Read App Group state (returns `null` off iOS) |
 | `setState<T>(key, value): Promise<void>` | Write App Group state; reloads Control Center so the toggle re-renders |
@@ -374,7 +410,9 @@ What works today:
 | 7 | Expo example app + xcodebuild compile E2E (host app + extension link on real SDK) | ✅ |
 | 8 | Documentation + RN CLI example + v0.1.0 release prep (publish = manual step) | ✅ |
 
-v0.2+: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, dynamic intents.
+**v0.2.0:** dynamic intents — user-configurable button controls (a `parameter` with selectable options; the choice arrives in `onAction.params`). ✅
+
+Later: Android Quick Settings Tiles for a unified cross-platform API, Lock Screen and Action Button control targets, runtime/queried dynamic options.
 
 ---
 
