@@ -1,0 +1,72 @@
+package {{packageName}}
+
+import android.os.Build
+import android.service.quicksettings.Tile
+import android.service.quicksettings.TileService
+{{#unless isToggle}}
+import android.app.PendingIntent
+import android.content.Intent
+import android.net.Uri
+{{/unless}}
+
+// ─────────────────────────────────────────────────────────────────────────
+//  📄  {{pascalCase id}}TileService.kt
+//  Quick Settings 타일 — iOS의 {{pascalCase id}}Control 에 대응 (Android)
+//  ⚠️ 자동 생성됨 — 직접 수정 금지. prebuild / `rn-control-center generate` 때 덮어써짐.
+//
+//  ControlStore(앱↔타일 공유 저장소 + 이벤트 큐)는 라이브러리 런타임에서 제공. (A2)
+// ─────────────────────────────────────────────────────────────────────────
+{{#if isToggle}}
+
+// 토글 타일 — 켜짐/꺼짐 상태를 가진다 (iOS ControlWidgetToggle 대응)
+class {{pascalCase id}}TileService : TileService() {
+
+    override fun onStartListening() {
+        super.onStartListening()
+        updateTile()
+    }
+
+    override fun onClick() {
+        super.onClick()
+        val next = !ControlStore.getBool(this, "{{stateKey}}")
+        ControlStore.setBool(this, "{{stateKey}}", next)
+        ControlStore.enqueueStateChange(this, "{{stateKey}}", next)
+        updateTile()
+    }
+
+    private fun updateTile() {
+        val tile = qsTile ?: return
+        tile.state = if (ControlStore.getBool(this, "{{stateKey}}")) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
+        tile.label = "{{title}}"
+        tile.updateTile()
+    }
+}
+{{else}}
+
+// 버튼 타일 — 클릭 시 액션을 큐에 넣고 앱을 연다 (iOS ControlWidgetButton 대응)
+class {{pascalCase id}}TileService : TileService() {
+
+    override fun onClick() {
+        super.onClick()
+
+        // ① App↔타일 공유 큐에 이벤트 기록 (앱이 drain → JS onAction)
+        ControlStore.enqueueAction(this, "{{id}}", "{{deepLink}}")
+
+        // ② 앱 열기 (딥링크)
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("{{deepLink}}")).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        if (Build.VERSION.SDK_INT >= 34) {
+            // API 34+ 는 PendingIntent를 요구
+            val pending = PendingIntent.getActivity(
+                this, 0, intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            startActivityAndCollapse(pending)
+        } else {
+            @Suppress("DEPRECATION")
+            startActivityAndCollapse(intent)
+        }
+    }
+}
+{{/if}}
