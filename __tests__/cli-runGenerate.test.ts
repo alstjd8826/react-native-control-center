@@ -24,6 +24,7 @@ function withTempBareProject(opts: {
   controlsTs: string;
   packageRnControlCenter: object | undefined;
   bundleId?: string;
+  withAndroid?: boolean;
   fn: (projectRoot: string) => void;
 }): void {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'rncc-bare-'));
@@ -56,6 +57,29 @@ function withTempBareProject(opts: {
     FIXTURE_PBXPROJ,
     path.join(projectRoot, 'ios', 'QuickNote.xcodeproj', 'project.pbxproj')
   );
+
+  // android/ 스캐폴드 (선택) — bare RN 레이아웃 흉내
+  if (opts.withAndroid) {
+    const appMain = path.join(projectRoot, 'android', 'app', 'src', 'main');
+    fs.mkdirSync(appMain, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, 'android', 'app', 'build.gradle'),
+      `android {\n    defaultConfig {\n        applicationId "${opts.bundleId ?? 'com.demo.app'}"\n    }\n}\n`
+    );
+    fs.writeFileSync(
+      path.join(appMain, 'AndroidManifest.xml'),
+      `<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:name=".MainApplication">
+    <activity android:name=".MainActivity" android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>`
+    );
+  }
 
   try {
     opts.fn(projectRoot);
@@ -217,6 +241,48 @@ describe('runGenerate (RN CLI)', () => {
         expect(intentSwift).toContain('demo://control/quickNote');
         expect(result.widgetTargetUuid).toBeTruthy();
       },
+    });
+  });
+
+  describe('Android path', () => {
+    it('generates tiles + manifest + scheme when android/ exists', () => {
+      withTempBareProject({
+        controlsTs: buttonAndToggleControls,
+        bundleId: 'com.demo.app',
+        withAndroid: true,
+        packageRnControlCenter: { controls: './src/controls.ts', urlScheme: 'demo' },
+        fn: (projectRoot) => {
+          const result = runGenerate({ projectRoot });
+          const javaBase = path.join(
+            projectRoot,
+            'android/app/src/main/java/com/demo/app/tiles'
+          );
+          // 1) TileService.kt 파일들이 패키지 경로에 생성됨
+          expect(fs.existsSync(path.join(javaBase, 'QuickNoteTileService.kt'))).toBe(true);
+          expect(fs.existsSync(path.join(javaBase, 'VpnTileService.kt'))).toBe(true);
+          expect(result.filesWritten.some((f) => f.endsWith('QuickNoteTileService.kt'))).toBe(true);
+
+          // 2) Manifest에 <service> 주입 + 딥링크 scheme 등록
+          const manifest = fs.readFileSync(
+            path.join(projectRoot, 'android/app/src/main/AndroidManifest.xml'),
+            'utf-8'
+          );
+          expect(manifest).toContain('.tiles.QuickNoteTileService');
+          expect(manifest).toContain('android.permission.BIND_QUICK_SETTINGS_TILE');
+          expect(manifest).toContain('android:scheme="demo"');
+        },
+      });
+    });
+
+    it('skips Android silently when android/ is absent', () => {
+      withTempBareProject({
+        controlsTs: buttonControls,
+        packageRnControlCenter: { controls: './src/controls.ts', urlScheme: 'demo' },
+        fn: (projectRoot) => {
+          expect(() => runGenerate({ projectRoot })).not.toThrow();
+          expect(fs.existsSync(path.join(projectRoot, 'android'))).toBe(false);
+        },
+      });
     });
   });
 });
