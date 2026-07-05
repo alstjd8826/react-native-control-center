@@ -2,7 +2,7 @@
 
 iOS 18 Control Center controls **and** Android Quick Settings tiles for React Native — declare once in TypeScript, no Swift or Kotlin required.
 
-![status](https://img.shields.io/badge/status-v0.3.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![Android](https://img.shields.io/badge/Android-7%2B%20(API%2024)-green) ![license](https://img.shields.io/badge/license-MIT-green)
+![status](https://img.shields.io/badge/status-v0.4.0-brightgreen) ![iOS](https://img.shields.io/badge/iOS-18%2B-blue) ![Android](https://img.shields.io/badge/Android-7%2B%20(API%2024)-green) ![license](https://img.shields.io/badge/license-MIT-green)
 
 > **v0.1.0.** Build-time pipeline (codegen + pbxproj wiring + Expo plugin + CLI) and runtime native module (Darwin observer → queue drain → JS events) are complete and compile end-to-end against the real iOS 18 SDK. The runtime hook gives synchronous initial state via a cache and re-renders Control Center on programmatic state change; a 5,000+ SF Symbol set backs build-time spell-check. See [Installation](#installation) and the [Roadmap](#roadmap).
 
@@ -329,15 +329,16 @@ ControlCenter.onAction(({ id, params }) => {
 
 ### `ControlCenter`
 
-Runtime singleton. Safe no-op off iOS 18.
+Runtime singleton. No-ops safely on unsupported platforms (off iOS 18 / Android).
 
 | Member | Description |
 | --- | --- |
-| `isAvailable(): boolean` | `true` only on iOS 18+ with the native module loaded |
-| `onAction(cb): () => void` | Fires when a **button** is tapped; `cb({ id, deepLink?, params?, t })`. `params` holds the chosen value for dynamic buttons. Returns an unsubscribe fn |
+| `isAvailable(): boolean` | `true` when the native module is loaded (iOS 18+ or Android) |
+| `onAction(cb): () => void` | Fires when a **button/button-tile** is tapped; `cb({ id, deepLink?, params?, t })`. `params` holds the chosen value for dynamic buttons. Returns an unsubscribe fn |
 | `onStateChange<T>(key, cb): () => void` | Fires when a **toggle**'s `stateKey` changes. Returns an unsubscribe fn |
-| `getState<T>(key): Promise<T \| null>` | Read App Group state (returns `null` off iOS) |
-| `setState<T>(key, value): Promise<void>` | Write App Group state; reloads Control Center so the toggle re-renders |
+| `getState<T>(key): Promise<T \| null>` | Read shared state (App Group on iOS / SharedPreferences on Android) |
+| `setState<T>(key, value): Promise<void>` | Write shared state; on iOS reloads Control Center so the toggle re-renders |
+| `requestAddTile(id, label?): Promise<void>` | **Android 13+**: show the system "add this tile?" prompt. No-op on iOS / older Android |
 
 ### `useControlState<T>(stateKey)`
 
@@ -358,12 +359,18 @@ no separate config:
 
 What the library does for you: generates a `TileService` per control, registers
 it in `AndroidManifest.xml`, ships the shared store + native module (autolinked),
-and registers your `urlScheme` so tiles can open the app.
+and registers your `urlScheme` so tiles can open the app. Works from both the
+Expo config plugin and the bare-RN CLI (`npx rn-control-center generate`).
 
-> **Adding tiles to the panel.** Android does not let an app force a tile into
-> the user's Quick Settings — the user adds it from the QS edit screen. (An
-> in-app `requestAddTile` prompt is on the roadmap.) Unlike iOS, tiles run in the
-> app process, so no App Group is needed.
+**Tile icon.** Add `androidIcon: 'ic_name'` to a control to use `@drawable/ic_name`
+for its tile; without it the tile falls back to the app launcher icon. Unlike iOS
+SF Symbols there's no bundled glyph — ship the drawable in your Android `res/`.
+
+**Adding tiles to the panel.** Android can't force a tile into Quick Settings —
+the user adds it. Call `ControlCenter.requestAddTile(id, label?)` to show the
+system "add this tile?" prompt (Android 13+; no-ops elsewhere), or the user adds
+it from the QS edit screen. Unlike iOS, tiles run in the app process, so no App
+Group is needed.
 
 ## Troubleshooting
 
@@ -431,11 +438,13 @@ What works today:
 | 7 | Expo example app + xcodebuild compile E2E (host app + extension link on real SDK) | ✅ |
 | 8 | Documentation + RN CLI example + v0.1.0 release prep (publish = manual step) | ✅ |
 
+**v0.4.0:** Android polish — bare-RN CLI now emits tiles too (parity with the Expo plugin), `ControlCenter.requestAddTile()` shows the system add-tile prompt, and `androidIcon` sets a per-tile drawable. ✅
+
 **v0.3.0:** Android Quick Settings tiles — the same `defineControls` config now generates `TileService`s (button + toggle), autolinks the Kotlin runtime, and registers the deep link scheme. Verified on an emulator (tile tap → `ControlStore`). ✅
 
 **v0.2.0:** dynamic intents — user-configurable button controls (a `parameter` with selectable options; the choice arrives in `onAction.params`). ✅
 
-Later: in-app `requestAddTile` prompt, Lock Screen / Action Button control targets, runtime/queried dynamic options.
+Later: Lock Screen / Action Button control targets, SF Symbol → Material auto icon mapping, runtime/queried dynamic options.
 
 ---
 
