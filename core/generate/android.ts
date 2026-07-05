@@ -54,7 +54,7 @@ const SERVICE_TEMPLATE = Handlebars.compile(
   `        <service
             android:name=".tiles.{{pascalCase id}}TileService"
             android:exported="true"
-            android:icon="@mipmap/ic_launcher"
+            android:icon="{{iconRes}}"
             android:label="{{title}}"
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
             <intent-filter>
@@ -85,11 +85,16 @@ export function generateAndroidFiles(opts: GenerateAndroidOptions): AndroidGenRe
         ? control.deepLink ?? `${opts.urlScheme}://control/${control.id}`
         : '';
 
+    // androidIcon 지정 시 @drawable/{name}, 없으면 앱 런처 아이콘 fallback.
+    const iconRes = control.androidIcon
+      ? `@drawable/${control.androidIcon}`
+      : '@mipmap/ic_launcher';
+
     files.push({
       path: `${pkgPath}/${pascalCase(control.id)}TileService.kt`,
       content: tile({ ...control, packageName, isToggle, deepLink }),
     });
-    services.push(SERVICE_TEMPLATE({ ...control }));
+    services.push(SERVICE_TEMPLATE({ ...control, iconRes }));
   }
 
   return { files, manifestServices: services.join('\n') };

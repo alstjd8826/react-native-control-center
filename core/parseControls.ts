@@ -1,42 +1,47 @@
-import * as fs from 'node:fs';
-import { parse } from '@babel/parser';
-import traverseDefault from '@babel/traverse';
-import type { NodePath } from '@babel/traverse';
+import * as fs from "node:fs";
+import { parse } from "@babel/parser";
+import traverseDefault from "@babel/traverse";
+import type { NodePath } from "@babel/traverse";
 import type {
   ObjectExpression,
   ObjectProperty,
   Node,
   CallExpression,
-} from '@babel/types';
-import { ParseError, type ParsedControl } from './types';
-import type { ControlParameter } from '../src/types';
+} from "@babel/types";
+import { ParseError, type ParsedControl } from "./types";
+import type { ControlParameter } from "../src/types";
 
 // @babel/traverse는 ESM/CJS 혼합 때문에 .default가 있을 수 있음
 const traverse =
-  typeof traverseDefault === 'function' ? traverseDefault : (traverseDefault as any).default;
+  typeof traverseDefault === "function"
+    ? traverseDefault
+    : (traverseDefault as any).default;
 
 /**
  * TS 파일을 읽어 defineControls({...}) 호출을 찾고 컨트롤 배열을 추출.
  */
 export function parseControlsFile(filePath: string): ParsedControl[] {
-  const source = fs.readFileSync(filePath, 'utf-8');
+  const source = fs.readFileSync(filePath, "utf-8");
   return parseControlsSource(source, filePath);
 }
 
 /**
  * 소스 문자열을 받아 파싱 (테스트에 편리).
  */
-export function parseControlsSource(source: string, filePath = '<source>'): ParsedControl[] {
+export function parseControlsSource(
+  source: string,
+  filePath = "<source>",
+): ParsedControl[] {
   let ast: ReturnType<typeof parse>;
   try {
     ast = parse(source, {
-      sourceType: 'module',
-      plugins: ['typescript'],
+      sourceType: "module",
+      plugins: ["typescript"],
     });
   } catch (err) {
     throw new ParseError(
       `Failed to parse TypeScript: ${(err as Error).message}`,
-      filePath
+      filePath,
     );
   }
 
@@ -45,15 +50,16 @@ export function parseControlsSource(source: string, filePath = '<source>'): Pars
   traverse(ast, {
     CallExpression(path: NodePath<CallExpression>) {
       const callee = path.node.callee;
-      if (callee.type !== 'Identifier' || callee.name !== 'defineControls') return;
+      if (callee.type !== "Identifier" || callee.name !== "defineControls")
+        return;
 
       const firstArg = path.node.arguments[0];
-      if (!firstArg || firstArg.type !== 'ObjectExpression') {
+      if (!firstArg || firstArg.type !== "ObjectExpression") {
         throw new ParseError(
-          'defineControls() must receive an object literal as its first argument.',
+          "defineControls() must receive an object literal as its first argument.",
           filePath,
           path.node.loc?.start.line,
-          path.node.loc?.start.column
+          path.node.loc?.start.column,
         );
       }
       defineCallArg = firstArg;
@@ -63,38 +69,44 @@ export function parseControlsSource(source: string, filePath = '<source>'): Pars
 
   if (!defineCallArg) {
     throw new ParseError(
-      'No defineControls({...}) call found in file.',
-      filePath
+      "No defineControls({...}) call found in file.",
+      filePath,
     );
   }
 
   return extractControls(defineCallArg, filePath);
 }
 
-function extractControls(obj: ObjectExpression, filePath: string): ParsedControl[] {
+function extractControls(
+  obj: ObjectExpression,
+  filePath: string,
+): ParsedControl[] {
   const controls: ParsedControl[] = [];
 
   for (const prop of obj.properties) {
-    if (prop.type !== 'ObjectProperty') {
+    if (prop.type !== "ObjectProperty") {
       throw new ParseError(
         `Unsupported property kind "${prop.type}" inside defineControls. Use plain key: value pairs only.`,
         filePath,
         prop.loc?.start.line,
-        prop.loc?.start.column
+        prop.loc?.start.column,
       );
     }
 
     const id = getKeyName(prop, filePath);
-    if (prop.value.type !== 'ObjectExpression') {
+    if (prop.value.type !== "ObjectExpression") {
       throw new ParseError(
         `Control "${id}" must be an object literal.`,
         filePath,
         prop.value.loc?.start.line,
-        prop.value.loc?.start.column
+        prop.value.loc?.start.column,
       );
     }
 
-    const configRaw = objectExpressionToLiteral(prop.value, filePath) as Record<string, unknown>;
+    const configRaw = objectExpressionToLiteral(prop.value, filePath) as Record<
+      string,
+      unknown
+    >;
     controls.push(validateControl(id, configRaw, filePath));
   }
 
@@ -102,13 +114,13 @@ function extractControls(obj: ObjectExpression, filePath: string): ParsedControl
 }
 
 function getKeyName(prop: ObjectProperty, filePath: string): string {
-  if (prop.key.type === 'Identifier') return prop.key.name;
-  if (prop.key.type === 'StringLiteral') return prop.key.value;
+  if (prop.key.type === "Identifier") return prop.key.name;
+  if (prop.key.type === "StringLiteral") return prop.key.value;
   throw new ParseError(
     `Control key must be a plain identifier or string literal.`,
     filePath,
     prop.key.loc?.start.line,
-    prop.key.loc?.start.column
+    prop.key.loc?.start.column,
   );
 }
 
@@ -118,48 +130,53 @@ function getKeyName(prop: ObjectProperty, filePath: string): string {
  */
 function objectExpressionToLiteral(node: Node, filePath: string): unknown {
   switch (node.type) {
-    case 'StringLiteral':
-    case 'NumericLiteral':
-    case 'BooleanLiteral':
+    case "StringLiteral":
+    case "NumericLiteral":
+    case "BooleanLiteral":
       return node.value;
-    case 'NullLiteral':
+    case "NullLiteral":
       return null;
-    case 'TemplateLiteral':
+    case "TemplateLiteral":
       if (node.expressions.length > 0) {
-        throw literalOnly(node, filePath, 'template string with ${} interpolation');
+        throw literalOnly(
+          node,
+          filePath,
+          "template string with ${} interpolation",
+        );
       }
-      return node.quasis.map((q) => q.value.cooked).join('');
-    case 'ArrayExpression':
+      return node.quasis.map((q) => q.value.cooked).join("");
+    case "ArrayExpression":
       return node.elements.map((el) => {
         if (el === null) return null;
-        if (el.type === 'SpreadElement') throw literalOnly(el, filePath, 'spread element');
+        if (el.type === "SpreadElement")
+          throw literalOnly(el, filePath, "spread element");
         return objectExpressionToLiteral(el, filePath);
       });
-    case 'ObjectExpression': {
+    case "ObjectExpression": {
       const out: Record<string, unknown> = {};
       for (const prop of node.properties) {
-        if (prop.type !== 'ObjectProperty') {
+        if (prop.type !== "ObjectProperty") {
           throw literalOnly(prop, filePath, prop.type);
         }
         const key =
-          prop.key.type === 'Identifier'
+          prop.key.type === "Identifier"
             ? prop.key.name
-            : prop.key.type === 'StringLiteral'
+            : prop.key.type === "StringLiteral"
               ? prop.key.value
               : null;
         if (key === null) {
-          throw literalOnly(prop.key, filePath, 'computed key');
+          throw literalOnly(prop.key, filePath, "computed key");
         }
         out[key] = objectExpressionToLiteral(prop.value, filePath);
       }
       return out;
     }
-    case 'Identifier':
+    case "Identifier":
       throw literalOnly(node, filePath, `variable reference "${node.name}"`);
-    case 'CallExpression':
-      throw literalOnly(node, filePath, 'function call');
-    case 'MemberExpression':
-      throw literalOnly(node, filePath, 'member access');
+    case "CallExpression":
+      throw literalOnly(node, filePath, "function call");
+    case "MemberExpression":
+      throw literalOnly(node, filePath, "member access");
     default:
       throw literalOnly(node, filePath, node.type);
   }
@@ -170,7 +187,7 @@ function literalOnly(node: Node, filePath: string, kind: string): ParseError {
     `Only literal values allowed — found ${kind}.`,
     filePath,
     node.loc?.start.line,
-    node.loc?.start.column
+    node.loc?.start.column,
   );
 }
 
@@ -178,57 +195,82 @@ function literalOnly(node: Node, filePath: string, kind: string): ParseError {
 function validateControl(
   id: string,
   raw: Record<string, unknown>,
-  filePath: string
+  filePath: string,
 ): ParsedControl {
-  const type = raw['type'];
+  const type = raw["type"];
 
-  if (type === 'button') {
-    if (typeof raw['title'] !== 'string') throw missingField(id, 'title', filePath);
-    if (typeof raw['icon'] !== 'string') throw missingField(id, 'icon', filePath);
+  if (type === "button") {
+    if (typeof raw["title"] !== "string")
+      throw missingField(id, "title", filePath);
+    if (typeof raw["icon"] !== "string")
+      throw missingField(id, "icon", filePath);
     return {
       id,
-      type: 'button',
-      title: raw['title'] as string,
-      icon: raw['icon'] as string,
-      ...(raw['tint'] !== undefined && { tint: raw['tint'] as `#${string}` }),
-      ...(raw['description'] !== undefined && { description: raw['description'] as string }),
-      ...(raw['deepLink'] !== undefined && { deepLink: raw['deepLink'] as string }),
+      type: "button",
+      title: raw["title"] as string,
+      icon: raw["icon"] as string,
+      ...(raw["tint"] !== undefined && { tint: raw["tint"] as `#${string}` }),
+      ...(raw["description"] !== undefined && {
+        description: raw["description"] as string,
+      }),
+      ...(raw["deepLink"] !== undefined && {
+        deepLink: raw["deepLink"] as string,
+      }),
       // parameter는 구조가 복잡해서 전용 검증을 거친 뒤 넣는다 (dynamic intents).
-      ...(raw['parameter'] !== undefined && {
-        parameter: validateParameter(id, raw['parameter'], filePath),
+      ...(raw["parameter"] !== undefined && {
+        parameter: validateParameter(id, raw["parameter"], filePath),
+      }),
+      ...(raw["androidIcon"] !== undefined && {
+        androidIcon: raw["androidIcon"] as string,
       }),
     };
   }
 
-  if (type === 'toggle') {
-    if (typeof raw['title'] !== 'string') throw missingField(id, 'title', filePath);
-    if (typeof raw['stateKey'] !== 'string') throw missingField(id, 'stateKey', filePath);
-    const icons = raw['icons'] as { on?: unknown; off?: unknown } | undefined;
-    if (!icons || typeof icons.on !== 'string' || typeof icons.off !== 'string') {
+  if (type === "toggle") {
+    if (typeof raw["title"] !== "string")
+      throw missingField(id, "title", filePath);
+    if (typeof raw["stateKey"] !== "string")
+      throw missingField(id, "stateKey", filePath);
+    const icons = raw["icons"] as { on?: unknown; off?: unknown } | undefined;
+    if (
+      !icons ||
+      typeof icons.on !== "string" ||
+      typeof icons.off !== "string"
+    ) {
       throw new ParseError(
         `Toggle "${id}" requires icons.on and icons.off as strings.`,
-        filePath
+        filePath,
       );
     }
     return {
       id,
-      type: 'toggle',
-      title: raw['title'] as string,
+      type: "toggle",
+      title: raw["title"] as string,
       icons: { on: icons.on, off: icons.off },
-      stateKey: raw['stateKey'] as string,
-      ...(raw['tint'] !== undefined && { tint: raw['tint'] as { on: `#${string}`; off: `#${string}` } }),
-      ...(raw['description'] !== undefined && { description: raw['description'] as string }),
+      stateKey: raw["stateKey"] as string,
+      ...(raw["tint"] !== undefined && {
+        tint: raw["tint"] as { on: `#${string}`; off: `#${string}` },
+      }),
+      ...(raw["description"] !== undefined && {
+        description: raw["description"] as string,
+      }),
+      ...(raw["androidIcon"] !== undefined && {
+        androidIcon: raw["androidIcon"] as string,
+      }),
     };
   }
 
   throw new ParseError(
     `Control "${id}" has invalid type "${String(type)}". Expected "button" or "toggle".`,
-    filePath
+    filePath,
   );
 }
 
 function missingField(id: string, field: string, filePath: string): ParseError {
-  return new ParseError(`Control "${id}" is missing required field "${field}".`, filePath);
+  return new ParseError(
+    `Control "${id}" is missing required field "${field}".`,
+    filePath,
+  );
 }
 
 /**
@@ -236,41 +278,54 @@ function missingField(id: string, field: string, filePath: string): ParseError {
  * objectExpressionToLiteral이 이미 평범한 JS 객체로 바꿔놨으므로,
  * 여기선 "모양이 맞는지"만 확인하고 타입이 보장된 ControlParameter를 반환한다.
  */
-function validateParameter(id: string, raw: unknown, filePath: string): ControlParameter {
-  if (typeof raw !== 'object' || raw === null) {
-    throw new ParseError(`Control "${id}" parameter must be an object.`, filePath);
+function validateParameter(
+  id: string,
+  raw: unknown,
+  filePath: string,
+): ControlParameter {
+  if (typeof raw !== "object" || raw === null) {
+    throw new ParseError(
+      `Control "${id}" parameter must be an object.`,
+      filePath,
+    );
   }
   const p = raw as Record<string, unknown>;
 
-  if (typeof p['key'] !== 'string') {
-    throw new ParseError(`Control "${id}" parameter requires a string "key".`, filePath);
+  if (typeof p["key"] !== "string") {
+    throw new ParseError(
+      `Control "${id}" parameter requires a string "key".`,
+      filePath,
+    );
   }
-  if (typeof p['title'] !== 'string') {
-    throw new ParseError(`Control "${id}" parameter requires a string "title".`, filePath);
+  if (typeof p["title"] !== "string") {
+    throw new ParseError(
+      `Control "${id}" parameter requires a string "title".`,
+      filePath,
+    );
   }
-  if (!Array.isArray(p['options']) || p['options'].length === 0) {
+  if (!Array.isArray(p["options"]) || p["options"].length === 0) {
     throw new ParseError(
       `Control "${id}" parameter requires a non-empty "options" array.`,
-      filePath
+      filePath,
     );
   }
 
-  const options = p['options'].map((opt, i) => {
-    if (typeof opt !== 'object' || opt === null) {
+  const options = p["options"].map((opt, i) => {
+    if (typeof opt !== "object" || opt === null) {
       throw new ParseError(
         `Control "${id}" parameter option #${i + 1} must be an object.`,
-        filePath
+        filePath,
       );
     }
     const o = opt as Record<string, unknown>;
-    if (typeof o['value'] !== 'string' || typeof o['label'] !== 'string') {
+    if (typeof o["value"] !== "string" || typeof o["label"] !== "string") {
       throw new ParseError(
         `Control "${id}" parameter option #${i + 1} requires string "value" and "label".`,
-        filePath
+        filePath,
       );
     }
-    return { value: o['value'], label: o['label'] };
+    return { value: o["value"], label: o["label"] };
   });
 
-  return { key: p['key'], title: p['title'], options };
+  return { key: p["key"], title: p["title"], options };
 }

@@ -70,6 +70,29 @@ describe('generateAndroidFiles', () => {
     expect(manifestServices).toContain('android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"');
     expect(manifestServices).toContain('android.service.quicksettings.action.QS_TILE');
   });
+
+  it('uses the app launcher icon when androidIcon is not set', () => {
+    const { manifestServices } = generateAndroidFiles({
+      controls: [button],
+      bundleId: 'com.acme.app',
+      urlScheme: 'acme',
+    });
+    expect(manifestServices).toContain('android:icon="@mipmap/ic_launcher"');
+  });
+
+  it('uses @drawable/<androidIcon> when provided (button + toggle)', () => {
+    const { manifestServices } = generateAndroidFiles({
+      controls: [
+        { ...button, androidIcon: 'ic_note' },
+        { ...toggle, androidIcon: 'ic_vpn' },
+      ],
+      bundleId: 'com.acme.app',
+      urlScheme: 'acme',
+    });
+    expect(manifestServices).toContain('android:icon="@drawable/ic_note"');
+    expect(manifestServices).toContain('android:icon="@drawable/ic_vpn"');
+    expect(manifestServices).not.toContain('@mipmap/ic_launcher');
+  });
 });
 
 describe('generated Kotlin (snapshots for review)', () => {

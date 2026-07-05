@@ -31,6 +31,7 @@ export interface ButtonControl {
   description?: string;
   deepLink?: string;
   parameter?: ControlParameter;
+  androidIcon?: string; // Android 타일 아이콘 (drawable 리소스명). 없으면 앱 아이콘 fallback
 }
 
 export interface ToggleControl {
@@ -40,6 +41,7 @@ export interface ToggleControl {
   tint?: { on: HexColor; off: HexColor };
   stateKey: string;
   description?: string;
+  androidIcon?: string; // Android 타일 아이콘 (drawable 리소스명). 없으면 앱 아이콘 fallback
 }
 
 export type Control = ButtonControl | ToggleControl;
