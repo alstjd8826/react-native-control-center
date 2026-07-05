@@ -1,5 +1,10 @@
 package com.rncontrolcenter
 
+import android.app.StatusBarManager
+import android.content.ComponentName
+import android.content.Context
+import android.graphics.drawable.Icon
+import android.os.Build
 import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -10,6 +15,7 @@ import com.facebook.react.bridge.WritableMap
 import com.facebook.react.modules.core.DeviceEventManagerModule
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.function.Consumer
 
 // ─────────────────────────────────────────────────────────────────────────
 //  RNControlCenterModule — 타일 이벤트를 JS로 배달하는 다리 (iOS RNControlCenter 대응)
@@ -39,6 +45,47 @@ class RNControlCenterModule(private val reactContext: ReactApplicationContext) :
         ControlStore.setBool(reactContext, key, value)
         promise.resolve(null)
     }
+
+    // ─── requestAddTile ──────────────────────────────────────────────────
+    //  앱에서 "이 타일을 빠른설정에 추가할래요?" 시스템 팝업을 띄운다. (API 33+)
+    //  iOS/구버전 Android에선 "unsupported"로 조용히 resolve (no-op 패턴).
+    //
+    //  result 값(Consumer<Int>): TILE_ADDED / TILE_NOT_ADDED / TILE_ALREADY_ADDED 등.
+    @ReactMethod
+    fun requestAddTile(id: String, label: String?, promise: Promise) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            promise.resolve("unsupported")
+            return
+        }
+        // requestAddTileService는 포어그라운드 앱(액티비티)에서 호출해야 한다.
+        val activity = reactContext.currentActivity
+        if (activity == null) {
+            promise.reject("no_activity", "requestAddTile must be called while the app is in the foreground.")
+            return
+        }
+
+        val pkg = reactContext.packageName
+        // codegen이 만든 클래스명 규칙과 일치해야 함: <pkg>.tiles.<PascalId>TileService
+        val component = ComponentName(pkg, "$pkg.tiles.${toPascalCase(id)}TileService")
+        // 아이콘: 지금은 앱 런처 아이콘 (SF Symbol→drawable 매핑은 별도 작업)
+        val icon = Icon.createWithResource(reactContext, reactContext.applicationInfo.icon)
+
+        val statusBar =
+            activity.getSystemService(Context.STATUS_BAR_SERVICE) as StatusBarManager
+        statusBar.requestAddTileService(
+            component,
+            label ?: id,
+            icon,
+            reactContext.mainExecutor,
+            Consumer<Int> { result -> promise.resolve(result) }
+        )
+    }
+
+    // core/generate/swift.ts 의 pascalCase 와 동일 규칙 (id → 클래스명).
+    private fun toPascalCase(str: String): String =
+        str.split(Regex("[-_ ]"))
+            .filter { it.isNotEmpty() }
+            .joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
 
     /** JS가 리스너를 붙인 뒤 호출 — 그 사이 쌓인 이벤트를 받기 위해. */
     @ReactMethod

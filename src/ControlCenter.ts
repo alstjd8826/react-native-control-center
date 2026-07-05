@@ -1,5 +1,5 @@
-import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
-import { getCachedState, setCachedState, seedCache } from './stateCache';
+import { NativeModules, NativeEventEmitter, Platform } from "react-native";
+import { getCachedState, setCachedState, seedCache } from "./stateCache";
 
 // ─────────────────────────────────────────────────────────────────────────
 //  ControlCenter — Native Module JS wrapper
@@ -19,6 +19,7 @@ const RNControlCenter = NativeModules.RNControlCenter as
       initialState?: Record<string, unknown>;
       // Android: 타일이 쌓아둔 이벤트 큐를 비워 JS로 발사하도록 요청. (iOS엔 없음)
       drain?(): Promise<void>;
+      requestAddTile?(id: string, label: string | null): Promise<unknown>;
     }
   | undefined;
 
@@ -42,7 +43,7 @@ class ControlCenterAPI {
   private emitter: NativeEventEmitter | null;
 
   constructor() {
-    const supported = Platform.OS === 'ios' || Platform.OS === 'android';
+    const supported = Platform.OS === "ios" || Platform.OS === "android";
     if (supported && RNControlCenter) {
       // iOS: addListener 첫 등록 시 Swift startObserving이 자동 호출됨.
       // Android: 이벤트는 RCTDeviceEventEmitter로 오고, 큐 비우기는 drain()으로.
@@ -55,10 +56,10 @@ class ControlCenterAPI {
       // 모든 ControlStateChange 이벤트를 캐시에 반영하는 내부 리스너.
       // 키별 구독(onStateChange)과 별개로, 어떤 키가 바뀌든 캐시는 항상 최신.
       this.emitter.addListener(
-        'ControlStateChange',
+        "ControlStateChange",
         (event: ControlStateChangeEvent) => {
           setCachedState(event.key, event.value);
-        }
+        },
       );
 
       // Android: JS 리스너가 붙은 지금, 타일이 앱 실행 전에 쌓아둔 이벤트를 흘려보낸다.
@@ -88,7 +89,7 @@ class ControlCenterAPI {
    */
   onAction(cb: (event: ControlActionEvent) => void): Unsubscribe {
     if (!this.emitter) return () => {};
-    const sub = this.emitter.addListener('ControlAction', cb);
+    const sub = this.emitter.addListener("ControlAction", cb);
     return () => sub.remove();
   }
 
@@ -100,10 +101,10 @@ class ControlCenterAPI {
   onStateChange<T>(key: string, cb: (value: T) => void): Unsubscribe {
     if (!this.emitter) return () => {};
     const sub = this.emitter.addListener(
-      'ControlStateChange',
+      "ControlStateChange",
       (event: ControlStateChangeEvent) => {
         if (event.key === key) cb(event.value as T);
-      }
+      },
     );
     return () => sub.remove();
   }
@@ -125,6 +126,12 @@ class ControlCenterAPI {
     setCachedState(key, value); // optimistic — 네이티브 왕복 전에 캐시 먼저 갱신
     if (!RNControlCenter) return;
     await RNControlCenter.setState(key, value as unknown);
+  }
+  async requestAddTile(id: string, label?: string): Promise<void> {
+    // Android + 네이티브에 메서드 있을 때만 호출, 아니면 조용히 no-op
+    if (!RNControlCenter) return;
+    if (!RNControlCenter?.requestAddTile) return;
+    await RNControlCenter.requestAddTile(id, label ?? null);
   }
 }
 
